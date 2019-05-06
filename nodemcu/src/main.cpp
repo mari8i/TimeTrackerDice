@@ -30,26 +30,18 @@ THE SOFTWARE.
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 
-#define PRINTLN(x)				\
-  Serial.println(x)
-
-#define PRINT(x)				\
-  Serial.print(x)
+#define PRINTLN(x) Serial.println(x)
+#define PRINT(x) Serial.print(x)
+//#define PRINTLN(x)
+//#define PRINT(x)
 
 #define INTERRUPT_PIN D5
 
-//#define OUTPUT_READABLE_QUATERNION
-//#define OUTPUT_READABLE_EULER
-//#define OUTPUT_READABLE_REALACCEL
-//#define OUTPUT_READABLE_YAWPITCHROLL
-//#define OUTPUT_READABLE_COMPARISON
-//#define OUTPUT_CURRENT_FACE
 #define OUTPUT_READABLE_GRAVITY
 
 #define FACES_NUMBER                9
-#define FACE_TOLERANCE              20.0
 #define FACE_CHANGE_DELAY_THRESHOLD 5000UL
-#define FACE_CHECK_DELAY            1000UL
+#define FACE_CHECK_DELAY            500UL
 
 
 const VectorFloat faces[FACES_NUMBER] =
@@ -67,36 +59,31 @@ const VectorFloat faces[FACES_NUMBER] =
 
 const char DEVICE_NAME[] = "TimeTrackerDice";
 
-const char* host = "192.168.1.143";
-const uint16_t port = 3000;
-
-
 MPU6050 mpu;
 
-bool dmpReady = false;  // set true if DMP init was successful
-uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
-uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
-uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
-uint16_t fifoCount;     // count of all bytes currently in FIFO
-uint8_t fifoBuffer[128]; // FIFO storage buffer
+bool dmpInitialized = false;
+uint8_t mpuIntStatus;
+uint8_t devStatus;
+uint16_t packetSize;
+uint16_t fifoCount;
+uint8_t fifoBuffer[128];
 
 Quaternion q;
 VectorFloat gravity;
 
 int lastFace = FACES_NUMBER;
-int lastNotifiedFace = FACES_NUMBER;
+int lastConfirmedFace = FACES_NUMBER;
 unsigned long lastFaceChange = 0UL;
 unsigned long faceCheckTimer = 0UL;
 
 WiFiClient wifiClient;
 
-volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
+volatile bool mpuInterrupt = false;
 void dmpDataReady() {
     mpuInterrupt = true;
 }
 
-void mpu_setup()
-{
+void mpuSetup() {
   Wire.begin(D1, D2);
   Wire.setClock(400000);
 
@@ -113,12 +100,6 @@ void mpu_setup()
   PRINTLN(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
 
-  // // supply your own gyro offsets here, scaled for min sensitivity
-  // mpu.setXGyroOffset(220);
-  // mpu.setYGyroOffset(76);
-  // mpu.setZGyroOffset(-85);
-  // mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
-
   // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
     // turn on the DMP, now that it's ready
@@ -132,7 +113,7 @@ void mpu_setup()
 
     // set our DMP Ready flag so the main loop() function knows it's okay to use it
     PRINTLN(F("DMP ready! Waiting for first interrupt..."));
-    dmpReady = true;
+    dmpInitialized = true;
 
     // get expected DMP packet size for later comparison
     packetSize = mpu.dmpGetFIFOPacketSize();
@@ -147,23 +128,8 @@ void mpu_setup()
   }
 }
 
-void setup(void)
-{
-  Serial.begin(9600);
-
-  WiFiManager wifiManager;
-  //wifiManager.resetSettings();
-
-  wifiManager.autoConnect(DEVICE_NAME);
-
-  PRINT(F("WiFi connected! IP address: "));
-  PRINTLN(WiFi.localIP());
-
-  mpu_setup();
-}
-
 float getVectorDistance(VectorFloat* v1, VectorFloat* v2) {
-  // Euclieidian distance is sqrt(sum((x1 - x2)^2 + (y1 - y2)^2 + (z1
+  // Eucleidian distance is sqrt(sum((x1 - x2)^2 + (y1 - y2)^2 + (z1
   // - z2)^2)) But we need the value just for comparison, and the
   // faster the better, so we remove the sqrt
 
@@ -194,9 +160,10 @@ bool isFaceChanged(int currentFace) {
   if (lastFace != currentFace) {
     lastFace = currentFace;
     lastFaceChange = millis();
-  } else if (lastNotifiedFace != currentFace && lastFaceChange <= (millis() - FACE_CHANGE_DELAY_THRESHOLD)) {
+  } else if (lastConfirmedFace != currentFace &&
+             lastFaceChange <= (millis() - FACE_CHANGE_DELAY_THRESHOLD)) {
     faceChanged = true;
-    lastNotifiedFace = currentFace;
+    lastConfirmedFace = currentFace;
   }
 
   return faceChanged;
@@ -221,10 +188,9 @@ void notifyFaceChanged(int currentFace) {
   http.end();
 }
 
-void mpu_loop()
-{
+void mpu_loop() {
   // if programming failed, don't try to do anything
-  if (!dmpReady) return;
+  if (!dmpInitialized) return;
 
   // wait for MPU interrupt or extra packet(s) available
   if (!mpuInterrupt && fifoCount < packetSize) return;
@@ -256,30 +222,7 @@ void mpu_loop()
       }
       faceCheckTimer = millis();
 
-#ifdef OUTPUT_READABLE_QUATERNION
-      // display quaternion values in easy matrix form: w x y z
-      PRINT("quat\t");
-      PRINT(q.w);
-      PRINT("\t");
-      PRINT(q.x);
-      PRINT("\t");
-      PRINT(q.y);
-      PRINT("\t");
-      PRINTLN(q.z);
-#endif
-
-#ifdef OUTPUT_READABLE_EULER
-      // display Euler angles in degrees
-      PRINT("euler\t");
-      PRINT(euler[0] * 180/M_PI);
-      PRINT("\t");
-      PRINT(euler[1] * 180/M_PI);
-      PRINT("\t");
-      PRINTLN(euler[2] * 180/M_PI);
-#endif
-
 #ifdef OUTPUT_READABLE_GRAVITY
-      // display Euler angles in degrees
       PRINT("gravity\t");
       PRINT(gravity.x);
       PRINT("\t");
@@ -287,40 +230,27 @@ void mpu_loop()
       PRINT("\t");
       PRINTLN(gravity.z);
 #endif
-
-#ifdef OUTPUT_READABLE_REALACCEL
-      // display real acceleration, adjusted to remove gravity
-      PRINT("areal\t");
-      PRINT(aaReal.x);
-      PRINT("\t");
-      PRINT(aaReal.y);
-      PRINT("\t");
-      PRINTLN(aaReal.z);
-#endif
-
-#ifdef OUTPUT_READABLE_YAWPITCHROLL
-      PRINT("ypr\t");
-      PRINT(ypr[0] * 180/M_PI);
-      PRINT("\t");
-      PRINT(ypr[1] * 180/M_PI);
-      PRINT("\t");
-      PRINTLN(ypr[2] * 180/M_PI);
-#endif
-
-#ifdef OUTPUT_CURRENT_FACE
-      PRINT(F("Currently in face: "));
-      PRINTLN(currentFace);
-#endif
     }
   }
 }
 
-void loop(void)
-{
+void setup(void) {
+  Serial.begin(9600);
+
+  WiFiManager wifiManager;
+  //wifiManager.resetSettings();
+
+  wifiManager.autoConnect(DEVICE_NAME);
+
+  PRINT(F("WiFi connected! IP address: "));
+  PRINTLN(WiFi.localIP());
+
+  mpuSetup();
+}
+
+void loop(void) {
   if (WiFi.status() != WL_CONNECTED) {
-    PRINTLN();
     PRINTLN("*** Disconnected from AP so rebooting ***");
-    PRINTLN();
     ESP.reset();
   }
 
