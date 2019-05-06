@@ -49,22 +49,8 @@ THE SOFTWARE.
 #define FACES_NUMBER                9
 #define FACE_TOLERANCE              20.0
 #define FACE_CHANGE_DELAY_THRESHOLD 5000UL
-#define FACE_CHECK_DELAY            2000UL
+#define FACE_CHECK_DELAY            1000UL
 
-
-
-// const float faces[FACES_NUMBER][3] =
-//   {
-//    {-88.89, 91.85,  -120.0},
-//    {-56.0 , -24.5,  1.0   },
-//    {-166.0, -157.0, 91.0  },
-//    {108.0,  -157.0, 178.0 },
-//    {137.0,  -156.0, -93.0 },
-//    {-115.0, 17.5,   0.3   },
-//    {156.5,  161.0,  93.0  },
-//    {130.0,  163.0,  178.0 },
-//    {-165.0, 161.0,  -92.0 }
-//   };
 
 const VectorFloat faces[FACES_NUMBER] =
   {
@@ -76,7 +62,7 @@ const VectorFloat faces[FACES_NUMBER] =
    VectorFloat(0.32f,	0.01f,	0.95f),
    VectorFloat(0.32f,	0.95f,	-0.01f),
    VectorFloat(0.32f,	0.01f,	-0.95f),
-   VectorFloat(0.32f,	-0.95f,	-0.01f)   
+   VectorFloat(0.32f,	-0.95f,	-0.01f)
   };
 
 const char DEVICE_NAME[] = "TimeTrackerDice";
@@ -94,14 +80,8 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[128]; // FIFO storage buffer
 
-// orientation/motion vars
-Quaternion q;           // [w, x, y, z]         quaternion container
-//VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-//VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
-VectorFloat gravity;    // [x, y, z]            gravity vector
-//float euler[3];         // [psi, theta, phi]    Euler angle container
-//float ypr[3];
-//float currentPosition[3];
+Quaternion q;
+VectorFloat gravity;
 
 int lastFace = FACES_NUMBER;
 int lastNotifiedFace = FACES_NUMBER;
@@ -182,98 +162,36 @@ void setup(void)
   mpu_setup();
 }
 
-// bool is_axis_in_position(float p1, float p2, float tolerance) {
-//   return abs(p1 - p2) <= tolerance;
-// }
-
-// bool isOnFacePosition(float* currPos, int face) {
-//   const float* faceXYZ = faces[face];
-  
-// #ifdef OUTPUT_READABLE_COMPARISON
-//   PRINT(F("Comparing XYZ Of face: "));
-//   PRINT(face);
-//   PRINT(" X: ");
-//   PRINT(faceXYZ[0]);
-//   PRINT(" <-> ");
-//   PRINT(currPos[0]);
-//   PRINT(" Y: ");
-//   PRINT(faceXYZ[1]);
-//   PRINT(" <-> ");
-//   PRINT(currPos[1]);
-//   PRINT(" Z: ");
-//   PRINT(faceXYZ[2]);
-//   PRINT(" <-> ");
-//   PRINTLN(currPos[2]);
-// #endif
-  
-//   return // is_axis_in_position(faceXYZ[0], currPos[0], FACE_TOLERANCE) &&
-//     is_axis_in_position(faceXYZ[1], currPos[1], FACE_TOLERANCE) &&
-//     is_axis_in_position(faceXYZ[2], currPos[2], FACE_TOLERANCE);
-// }
-
 float getVectorDistance(VectorFloat* v1, VectorFloat* v2) {
-  // PRINT("X1: ");
-  // PRINT(v1->x);
-  // PRINT("Y1: ");
-  // PRINT(v1->y);
-  // PRINT("Z1: ");
-  // PRINT(v1->z);
-  // PRINT(" <-> ");
-  // PRINT("X2: ");
-  // PRINT(v2->x);
-  // PRINT("Y2: ");
-  // PRINT(v2->y);
-  // PRINT("Z2: ");
-  // PRINT(v2->z);
-  // PRINTLN(" - ");
-  
-  return sqrt(pow(v1->x - v2->x, 2.0f) +
-	      pow(v1->y - v2->y, 2.0f) +
-	      pow(v1->z - v2->z, 2.0f));
+  // Euclieidian distance is sqrt(sum((x1 - x2)^2 + (y1 - y2)^2 + (z1
+  // - z2)^2)) But we need the value just for comparison, and the
+  // faster the better, so we remove the sqrt
+
+  return (pow(v1->x - v2->x, 2.0f) +
+          pow(v1->y - v2->y, 2.0f) +
+          pow(v1->z - v2->z, 2.0f));
 }
-			
+
 int getCurrentFace(VectorFloat* gravity) {
   float min = 0.0f;
   int res = -1;
-  
-  //PRINTLN("### DISTANCES ###");
+
   for (int f = 0; f < FACES_NUMBER; f++) {
     VectorFloat vf = faces[f];
     float distance = getVectorDistance(gravity, &vf);
-    //PRINT(F("Distance for face "));
-    //PRINT(f);
-    //PRINT(F(" is: "));
-    //PRINTLN(distance);
     if (res == -1 || distance < min) {
       res = f;
       min = distance;
     }
   }
 
-  //  PRINT(F("MIN Distance is face "));
-  //PRINT(res);
-  //PRINT(F(" is: "));
-  //PRINTLN(min);
-
   return res;
 }
-			
-// int getCurrentFace(VectorFloat& gravity) {  
-//   int currentFace = -1;
-//   for (int face = 0; face < FACES_NUMBER; face++) {
-//     if (isOnFacePosition(currentPosition, face)) {      
-//       currentFace = face;
-//       break;
-//     }
-//   }
-
-//   return currentFace;
-// }
 
 bool isFaceChanged(int currentFace) {
   bool faceChanged = false;
-  
-  if (lastFace != currentFace) {   
+
+  if (lastFace != currentFace) {
     lastFace = currentFace;
     lastFaceChange = millis();
   } else if (lastNotifiedFace != currentFace && lastFaceChange <= (millis() - FACE_CHANGE_DELAY_THRESHOLD)) {
@@ -290,9 +208,9 @@ void notifyFaceChanged(int currentFace) {
 
   HTTPClient http;
   String postData = "face=" + currentFace;
-  
-  http.begin(wifiClient, "http://192.168.1.143:8080/face/" + String(currentFace));              
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");  
+
+  http.begin(wifiClient, "http://192.168.1.143:8080/face/" + String(currentFace));
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
   int httpCode = http.POST(postData);
   String payload = http.getString();
@@ -349,7 +267,7 @@ void mpu_loop()
       PRINT("\t");
       PRINTLN(q.z);
 #endif
-    
+
 #ifdef OUTPUT_READABLE_EULER
       // display Euler angles in degrees
       PRINT("euler\t");
@@ -359,15 +277,15 @@ void mpu_loop()
       PRINT("\t");
       PRINTLN(euler[2] * 180/M_PI);
 #endif
-      
+
 #ifdef OUTPUT_READABLE_GRAVITY
       // display Euler angles in degrees
       PRINT("gravity\t");
       PRINT(gravity.x);
       PRINT("\t");
-      PRINT(gravity.y);     
+      PRINT(gravity.y);
       PRINT("\t");
-      PRINTLN(gravity.z);            
+      PRINTLN(gravity.z);
 #endif
 
 #ifdef OUTPUT_READABLE_REALACCEL
