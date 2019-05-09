@@ -24,6 +24,7 @@ THE SOFTWARE.
 #include <WiFiClient.h>
 #include <WiFiManager.h>
 #include <ESP8266HTTPClient.h>
+#include <EEPROM.h>
 #include "I2Cdev.h"
 
 #define __AVR__
@@ -75,6 +76,11 @@ int lastFace = FACES_NUMBER;
 int lastConfirmedFace = FACES_NUMBER;
 unsigned long lastFaceChange = 0UL;
 unsigned long faceCheckTimer = 0UL;
+
+struct { 
+  char username[40] = "";
+  char password[40] = "";
+} credentials;
 
 WiFiClient wifiClient;
 
@@ -236,15 +242,29 @@ void mpu_loop() {
 
 void setup(void) {
   Serial.begin(9600);
+  EEPROM.begin(512);
 
+  EEPROM.get(0, credentials);
+  
   WiFiManager wifiManager;
   //wifiManager.resetSettings();
+  
+  WiFiManagerParameter ttUsername("ttusername", "TimeTrackerDice username", credentials.username, 40);
+  wifiManager.addParameter(&ttUsername);
+  WiFiManagerParameter ttPassword("ttpassword", "TimeTrackerDice password", credentials.password, 40);
+  wifiManager.addParameter(&ttPassword);
 
   wifiManager.autoConnect(DEVICE_NAME);
 
   PRINT(F("WiFi connected! IP address: "));
   PRINTLN(WiFi.localIP());
 
+  strncpy(credentials.username, ttUsername.getValue(), 40);
+  strncpy(credentials.password, ttPassword.getValue(), 40);
+  
+  EEPROM.put(0, credentials);
+  EEPROM.commit();
+  
   mpuSetup();
 }
 
