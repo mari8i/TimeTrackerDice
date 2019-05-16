@@ -25,6 +25,7 @@ THE SOFTWARE.
 #include <WiFiManager.h>
 #include <ESP8266HTTPClient.h>
 #include <EEPROM.h>
+#include <ArduinoJson.h>
 #include "I2Cdev.h"
 
 #define __AVR__
@@ -38,12 +39,12 @@ THE SOFTWARE.
 
 #define INTERRUPT_PIN D5
 
-#define OUTPUT_READABLE_GRAVITY
+//#define OUTPUT_READABLE_GRAVITY
 
 #define FACES_NUMBER                9
 #define FACE_CHANGE_DELAY_THRESHOLD 5000UL
 #define FACE_CHECK_DELAY            500UL
-
+#define JSON_BUFFER_SIZE            200 
 
 const VectorFloat faces[FACES_NUMBER] =
   {
@@ -69,20 +70,16 @@ uint16_t packetSize;
 uint16_t fifoCount;
 uint8_t fifoBuffer[128];
 
-Quaternion q;
-VectorFloat gravity;
-
 int lastFace = FACES_NUMBER;
 int lastConfirmedFace = FACES_NUMBER;
 unsigned long lastFaceChange = 0UL;
 unsigned long faceCheckTimer = 0UL;
+String token = "";
 
 struct { 
   char username[40] = "";
   char password[40] = "";
 } credentials;
-
-WiFiClient wifiClient;
 
 volatile bool mpuInterrupt = false;
 void dmpDataReady() {
@@ -175,23 +172,80 @@ bool isFaceChanged(int currentFace) {
   return faceChanged;
 }
 
+void authenticate() {
+  PRINT(F("Authenticating with credentials: "));
+  PRINT(String(credentials.username));
+  PRINT(F(" - "));
+  PRINTLN(String(credentials.password));
+
+  String postData;
+  {
+    StaticJsonDocument<JSON_BUFFER_SIZE> doc;
+    doc["username"] = "mariotti"; //String(credentials.username);
+    doc["password"] = "demo"; //String(credentials.password);
+    serializeJson(doc, postData);
+
+    PRINT("Payload is: ");
+    PRINTLN(postData);
+  }
+
+  WiFiClient wifiClient; 
+  HTTPClient http;
+  //http.setTimeout(60000);
+  http.begin(wifiClient, "http://192.168.1.143:8000/login/");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  http.writeToStream(&Serial);    
+  int httpCode = http.POST(postData + "\n\n");  
+  String payload = http.getString();
+  http.end();
+  
+  PRINTLN(httpCode);
+  PRINTLN(payload);
+
+  if (httpCode == HTTP_CODE_OK) {
+    StaticJsonDocument<JSON_BUFFER_SIZE> doc;
+    
+    deserializeJson(doc, payload);
+    
+    token = String(doc["token"].as<String>());
+
+    PRINTLN(F("AUTHENTICATED! TOKEN: "));
+    PRINTLN(token);
+    
+    //EEPROM.put(0, credentials);
+    //EEPROM.commit();
+  } else {
+    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());   
+    PRINTLN("NOT AUTHENTICATED");
+    //ESP.reset();
+  } 
+}
+
 void notifyFaceChanged(int currentFace) {
   PRINT(F("Notifying change to face: "));
   PRINTLN(currentFace);
 
+  WiFiClient wifiClient;
   HTTPClient http;
-  String postData = "face=" + currentFace;
 
-  http.begin(wifiClient, "http://192.168.1.143:8080/face/" + String(currentFace));
+  http.setTimeout(60000);
+  http.begin(wifiClient, "http://192.168.1.143:8000/faces/" + String(currentFace));
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
+  http.addHeader("Authorization", "Token " + token);  
+  String postData = "HelloWorld\n\n";
   int httpCode = http.POST(postData);
   String payload = http.getString();
-
+  http.end();
+  
   PRINTLN(httpCode);
   PRINTLN(payload);
-
-  http.end();
+    
+  if (httpCode != HTTP_CODE_OK) {
+    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());    
+    authenticate();
+  } else {
+    PRINTLN("FACE CHANGED NOTIFIED!");
+  }
 }
 
 void mpu_loop() {
@@ -211,6 +265,9 @@ void mpu_loop() {
     mpu.resetFIFO();
     PRINTLN(F("FIFO overflow!"));
   } else if (mpuIntStatus & 0x02) {
+    Quaternion q;
+    VectorFloat gravity;
+    
     while (fifoCount < packetSize) {
       fifoCount = mpu.getFIFOCount();
     }
@@ -240,14 +297,28 @@ void mpu_loop() {
   }
 }
 
-void setup(void) {
-  Serial.begin(9600);
-  EEPROM.begin(512);
+void initEEPROM() {
+  strncpy(credentials.username, "", 40);
+  strncpy(credentials.password, "", 40);
 
-  EEPROM.get(0, credentials);
+  //EEPROM.begin(512);
+
+  //EEPROM.get(0, credentials);
+
   
+  if (strlen(credentials.username) > 32) {
+    PRINTLN("NO USERNAME FOUND, RESETTING");
+  }
+  
+  PRINTLN(credentials.username);
+}
+
+void setup(void) {
+  Serial.begin(9600);  
+  //wifiManager.resetSettings();  
+  initEEPROM();
+
   WiFiManager wifiManager;
-  //wifiManager.resetSettings();
   
   WiFiManagerParameter ttUsername("ttusername", "TimeTrackerDice username", credentials.username, 40);
   wifiManager.addParameter(&ttUsername);
@@ -258,12 +329,16 @@ void setup(void) {
 
   PRINT(F("WiFi connected! IP address: "));
   PRINTLN(WiFi.localIP());
-
-  strncpy(credentials.username, ttUsername.getValue(), 40);
-  strncpy(credentials.password, ttPassword.getValue(), 40);
   
-  EEPROM.put(0, credentials);
-  EEPROM.commit();
+  PRINTLN(ttUsername.getValue());
+  
+  //strncpy(credentials.username, ttUsername.getValue(), 40);
+  //strncpy(credentials.password, ttPassword.getValue(), 40);
+  //strncpy(credentials.username, "mariotti", 40);
+  //strncpy(credentials.password, "demo", 40);
+  
+  delay(5000);
+  authenticate();
   
   mpuSetup();
 }

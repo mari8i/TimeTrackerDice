@@ -1,0 +1,14 @@
+# -*- restclient -*-
+#
+# LOGIN
+POST http://192.168.1.143:8080/login/
+Content-Type: application/json
+{
+	"username": "mariotti",
+	"password": "demo"
+}
+
+# Change Face
+POST http://192.168.1.143:8080/faces/4
+Content-Type: application/json
+Authorization: Token c5e9c47808fb6bfc576124600f95804c5cbde874
