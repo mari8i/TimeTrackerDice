@@ -23,7 +23,6 @@ THE SOFTWARE.
 #include <DNSServer.h>
 #include <WiFiClient.h>
 #include <WiFiManager.h>
-#include <ESP8266HTTPClient.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include "I2Cdev.h"
@@ -60,6 +59,8 @@ const VectorFloat faces[FACES_NUMBER] =
   };
 
 const char DEVICE_NAME[] = "TimeTrackerDice";
+const String HOSTNAME = "192.168.1.143";
+const int PORT = 8000;
 
 MPU6050 mpu;
 
@@ -172,6 +173,73 @@ bool isFaceChanged(int currentFace) {
   return faceChanged;
 }
 
+bool waitClientResponse(WiFiClient client) {
+  unsigned long interval = 5000UL;
+  unsigned long currentMillis = millis(), previousMillis = millis();
+
+  while (!client.available()) {
+    if ((currentMillis - previousMillis) > interval) {
+      Serial.println("Timeout");
+      client.stop();     
+      return false;
+    }
+      
+    currentMillis = millis();
+  }
+
+  return true;
+}
+
+int readClientResponseHttpCode(WiFiClient client) {
+  while (client.connected() || client.available()) {
+    if (client.available()) {
+      String line = client.readStringUntil('\n');
+      Serial.println(line);
+      
+      if (line.startsWith("HTTP/1.1")) {
+	return line.substring(9, 12).toInt();
+      }
+    }
+  }
+
+  return -1;
+}
+
+String readClientResponsePayload(WiFiClient client) {
+  String payload = "";
+  bool inPayload = false;
+  while (client.connected() || client.available()) {
+    if (client.available()) {
+      String line = client.readStringUntil('\n');
+      Serial.println(line);
+      
+      if (line.startsWith("Content-Length")) {
+	inPayload = true;
+      } else if (inPayload) {
+	payload += line;
+      }
+    }
+  }
+
+  return payload;
+}
+
+void clientPostData(WiFiClient client, String url, String postData, bool authenticated) {
+  client.println("POST " + url + " HTTP/1.1");
+  client.println("Host: " + HOSTNAME);
+  client.println("Cache-Control: no-cache");
+  client.println("Content-Type: application/json");
+  
+  if (authenticated) {
+    client.println("Authorization: Token " + token);
+  }
+  
+  client.print("Content-Length: ");
+  client.println(postData.length());
+  client.println();
+  client.println(postData);
+}
+
 void authenticate() {
   PRINT(F("Authenticating with credentials: "));
   PRINT(String(credentials.username));
@@ -181,70 +249,72 @@ void authenticate() {
   String postData;
   {
     StaticJsonDocument<JSON_BUFFER_SIZE> doc;
-    doc["username"] = "mariotti"; //String(credentials.username);
-    doc["password"] = "demo"; //String(credentials.password);
+    doc["username"] = String(credentials.username);
+    doc["password"] = String(credentials.password);
     serializeJson(doc, postData);
 
     PRINT("Payload is: ");
     PRINTLN(postData);
   }
 
-  WiFiClient wifiClient; 
-  HTTPClient http;
-  //http.setTimeout(60000);
-  http.begin(wifiClient, "http://192.168.1.143:8000/login/");
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  http.writeToStream(&Serial);    
-  int httpCode = http.POST(postData + "\n\n");  
-  String payload = http.getString();
-  http.end();
+  WiFiClient client;
+
+  if (client.connect(HOSTNAME, PORT)) {
+    clientPostData(client, "/login/", postData, false);
+
+    bool response = waitClientResponse(client);
+
+    if (response) {
+      int httpCode = readClientResponseHttpCode(client);
+      String payload = readClientResponsePayload(client);
   
-  PRINTLN(httpCode);
-  PRINTLN(payload);
+      PRINTLN(httpCode);
+      PRINTLN(payload);
 
-  if (httpCode == HTTP_CODE_OK) {
-    StaticJsonDocument<JSON_BUFFER_SIZE> doc;
-    
-    deserializeJson(doc, payload);
-    
-    token = String(doc["token"].as<String>());
+      if (httpCode == 200) {
+	StaticJsonDocument<JSON_BUFFER_SIZE> doc;    
+	deserializeJson(doc, payload);    
+	token = String(doc["token"].as<String>());
 
-    PRINTLN(F("AUTHENTICATED! TOKEN: "));
-    PRINTLN(token);
+	PRINTLN(F("AUTHENTICATED! TOKEN: "));
+	PRINTLN(token);   
+      } else {
+	PRINTLN("NOT AUTHENTICATED");
+	//ESP.reset();
+      }
+    }
     
-    //EEPROM.put(0, credentials);
-    //EEPROM.commit();
-  } else {
-    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());   
-    PRINTLN("NOT AUTHENTICATED");
-    //ESP.reset();
-  } 
+    client.stop();
+  }  
 }
 
 void notifyFaceChanged(int currentFace) {
   PRINT(F("Notifying change to face: "));
   PRINTLN(currentFace);
 
-  WiFiClient wifiClient;
-  HTTPClient http;
-
-  http.setTimeout(60000);
-  http.begin(wifiClient, "http://192.168.1.143:8000/faces/" + String(currentFace));
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  http.addHeader("Authorization", "Token " + token);  
-  String postData = "HelloWorld\n\n";
-  int httpCode = http.POST(postData);
-  String payload = http.getString();
-  http.end();
-  
-  PRINTLN(httpCode);
-  PRINTLN(payload);
+  WiFiClient client;
+  if (client.connect(HOSTNAME, 8000)) {
+    String postData = "HelloWorld";
     
-  if (httpCode != HTTP_CODE_OK) {
-    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());    
-    authenticate();
-  } else {
-    PRINTLN("FACE CHANGED NOTIFIED!");
+    clientPostData(client, "/faces/" + String(currentFace), postData, true);
+
+    bool response = waitClientResponse(client);
+
+    if (response) {
+      int httpCode = readClientResponseHttpCode(client);
+      String payload = readClientResponsePayload(client);
+
+      PRINTLN(httpCode);
+      PRINTLN(payload);
+    
+      if (httpCode != 200) {
+	authenticate();
+      } else {
+	PRINTLN("FACE CHANGED NOTIFIED!");
+      }
+    }
+    
+    client.stop();
   }
 }
 
@@ -334,12 +404,10 @@ void setup(void) {
   
   //strncpy(credentials.username, ttUsername.getValue(), 40);
   //strncpy(credentials.password, ttPassword.getValue(), 40);
-  //strncpy(credentials.username, "mariotti", 40);
-  //strncpy(credentials.password, "demo", 40);
+  strncpy(credentials.username, "mariotti", 40);
+  strncpy(credentials.password, "demo", 40);
   
-  delay(5000);
-  authenticate();
-  
+  authenticate(); 
   mpuSetup();
 }
 
