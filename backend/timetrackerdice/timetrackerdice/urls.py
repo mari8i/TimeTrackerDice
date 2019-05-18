@@ -21,5 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     #path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     path('login/', token_views.obtain_auth_token),    
-    path('faces/', include('toggl.urls'))
+    path('faces/', include('mapper.urls'))
 ]

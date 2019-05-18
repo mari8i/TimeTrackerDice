@@ -2,7 +2,7 @@ import logging
 
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
-from toggl import views
+from mapper import views
 
 
 urlpatterns = [
