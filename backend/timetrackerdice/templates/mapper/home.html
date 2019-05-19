@@ -1,0 +1,14 @@
+{% extends 'mapper/base.html' %}
+{% load bootstrap4 %}
+
+{% block title %}django-bootstrap4{% endblock %}
+
+{% block content %}
+This is <em>bootstrap4</em> for <strong>Django</strong>.
+<ul>
+{% for project in projects %}
+    <li>{{ project.name }}</li>
+{% endfor %}
+</ul>
+{% endblock %}
+

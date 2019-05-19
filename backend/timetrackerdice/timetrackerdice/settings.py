@@ -11,10 +11,15 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
+import sys
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Include BOOTSTRAP4_FOLDER in path
+BOOTSTRAP4_FOLDER = os.path.abspath(os.path.join(BASE_DIR, "..", "bootstrap4"))
+if BOOTSTRAP4_FOLDER not in sys.path:
+    sys.path.insert(0, BOOTSTRAP4_FOLDER)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
@@ -42,7 +47,10 @@ INSTALLED_APPS = [
     
     'rest_framework',
     'rest_framework.authtoken',
-
+    'dal',
+    'dal_select2',    
+    'bootstrap4',
+    
     'mapper',
 ]
 
@@ -61,7 +69,7 @@ ROOT_URLCONF = 'timetrackerdice.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['templates/'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -120,6 +128,7 @@ USE_L10N = True
 
 USE_TZ = True
 
+LOGIN_REDIRECT_URL = '/home'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
@@ -153,3 +162,11 @@ REST_FRAMEWORK = {
 #         },
 #     },
 # }
+
+# Settings for django-bootstrap4
+BOOTSTRAP4 = {
+    "error_css_class": "bootstrap4-error",
+    "required_css_class": "bootstrap4-required",
+    "javascript_in_head": True,
+    "include_jquery": True,
+}

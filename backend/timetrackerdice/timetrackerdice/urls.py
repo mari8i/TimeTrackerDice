@@ -20,6 +20,7 @@ from rest_framework.authtoken import views as token_views
 urlpatterns = [
     path('admin/', admin.site.urls),
     #path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path('accounts/', include('django.contrib.auth.urls')),
     path('login/', token_views.obtain_auth_token),    
-    path('faces/', include('mapper.urls'))
+    path('', include('mapper.urls'))
 ]

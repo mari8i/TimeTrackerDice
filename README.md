@@ -41,3 +41,5 @@ The Microcontroller is powered by a 18650 battery via a charger module.
 - https://www.instructables.com/id/MPU6050-Arduino-6-Axis-Accelerometer-Gyro-GY-521-B/
 - https://github.com/tzapu/WiFiManager
 - https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/MPU6050
+- https://grappelliproject.com/
+- 

@@ -6,7 +6,10 @@ from mapper import views
 
 
 urlpatterns = [
-    path('<int:face>', views.face_changed),
+    path('faces/<int:face>', views.face_changed),
+    path('home', views.HomePageView.as_view(), name='home'),
+    path('projects', views.ProjectsAutocomplete.as_view(),
+         name='projects-autocomplete'),    
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

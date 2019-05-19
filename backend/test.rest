@@ -11,4 +11,4 @@ Content-Type: application/json
 # Change Face
 POST http://localhost:8000/faces/0
 Content-Type: application/json
-Authorization: Token dbe2f2fd50d1e8d2e723f08b5b25fcd0257ddf50
+Authorization: Token 33905f0e31a77bc72e7570816ca7c76de066e74a
