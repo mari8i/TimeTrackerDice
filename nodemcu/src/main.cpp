@@ -41,9 +41,14 @@ THE SOFTWARE.
 //#define OUTPUT_READABLE_GRAVITY
 
 #define FACES_NUMBER                9
-#define FACE_CHANGE_DELAY_THRESHOLD 5000UL
+#define FACE_CHANGE_DELAY_THRESHOLD 2000UL
 #define FACE_CHECK_DELAY            500UL
 #define JSON_BUFFER_SIZE            200 
+
+#define HTTP_CONNECTION_TIMEOUT     10000UL
+
+#define AUTHENTICATION_RETRIES      3
+#define NOTIFY_FACE_RETRIES         1
 
 const VectorFloat faces[FACES_NUMBER] =
   {
@@ -76,11 +81,20 @@ int lastConfirmedFace = FACES_NUMBER;
 unsigned long lastFaceChange = 0UL;
 unsigned long faceCheckTimer = 0UL;
 String token = "";
+bool authenticated = false;
 
 struct { 
   char username[40] = "";
   char password[40] = "";
 } credentials;
+
+void resetWifi() {
+  PRINTLN("RESETTING WIFI SETTINGS");  
+  WiFi.disconnect(true);
+  delay(3000);
+  ESP.reset();
+  delay(3000);
+}
 
 volatile bool mpuInterrupt = false;
 void dmpDataReady() {
@@ -112,6 +126,7 @@ void mpuSetup() {
 
     // enable Arduino interrupt detection
     PRINTLN(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
+    PRINTLN(digitalPinToInterrupt(INTERRUPT_PIN));
     attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
     mpuIntStatus = mpu.getIntStatus();
 
@@ -174,12 +189,11 @@ bool isFaceChanged(int currentFace) {
 }
 
 bool waitClientResponse(WiFiClient client) {
-  unsigned long interval = 5000UL;
   unsigned long currentMillis = millis(), previousMillis = millis();
 
-  while (!client.available()) {
-    if ((currentMillis - previousMillis) > interval) {
-      Serial.println("Timeout");
+  while (client.connected() && !client.available()) {
+    if ((currentMillis - previousMillis) > HTTP_CONNECTION_TIMEOUT) {
+      PRINTLN("Timeout");
       client.stop();     
       return false;
     }
@@ -194,7 +208,7 @@ int readClientResponseHttpCode(WiFiClient client) {
   while (client.connected() || client.available()) {
     if (client.available()) {
       String line = client.readStringUntil('\n');
-      Serial.println(line);
+      PRINTLN(line);
       
       if (line.startsWith("HTTP/1.1")) {
 	return line.substring(9, 12).toInt();
@@ -211,7 +225,7 @@ String readClientResponsePayload(WiFiClient client) {
   while (client.connected() || client.available()) {
     if (client.available()) {
       String line = client.readStringUntil('\n');
-      Serial.println(line);
+      PRINTLN(line);
       
       if (line.startsWith("Content-Length")) {
 	inPayload = true;
@@ -238,9 +252,12 @@ void clientPostData(WiFiClient client, String url, String postData, bool authent
   client.println(postData.length());
   client.println();
   client.println(postData);
+  client.flush();  // Don't waste your life: always flush  
 }
 
-void authenticate() {
+bool authenticateAux() {
+  bool result = false;
+  
   PRINT(F("Authenticating with credentials: "));
   PRINT(String(credentials.username));
   PRINT(F(" - "));
@@ -277,21 +294,42 @@ void authenticate() {
 	token = String(doc["token"].as<String>());
 
 	PRINTLN(F("AUTHENTICATED! TOKEN: "));
-	PRINTLN(token);   
+	PRINTLN(token);
+	authenticated = true;
+	result = true;
       } else {
 	PRINTLN("NOT AUTHENTICATED");
-	//ESP.reset();
+	authenticated = false;
       }
     }
     
     client.stop();
-  }  
+  }
+
+  return result;
 }
 
-void notifyFaceChanged(int currentFace) {
+void authenticate() {
+  int _try = 0;
+
+  while (_try < AUTHENTICATION_RETRIES) {
+    PRINT("Authentication try ");
+    PRINTLN(_try);
+    if (authenticateAux()) {
+      return;
+    }
+    _try++;
+  }
+
+  resetWifi();
+}
+
+int notifyFaceChangedAux(int currentFace) {
   PRINT(F("Notifying change to face: "));
   PRINTLN(currentFace);
 
+  int httpCode = -1;
+  
   WiFiClient client;
   if (client.connect(HOSTNAME, 8000)) {
     String postData = "HelloWorld";
@@ -301,20 +339,40 @@ void notifyFaceChanged(int currentFace) {
     bool response = waitClientResponse(client);
 
     if (response) {
-      int httpCode = readClientResponseHttpCode(client);
+      httpCode = readClientResponseHttpCode(client);
       String payload = readClientResponsePayload(client);
 
       PRINTLN(httpCode);
       PRINTLN(payload);
-    
-      if (httpCode != 200) {
-	authenticate();
-      } else {
-	PRINTLN("FACE CHANGED NOTIFIED!");
-      }
     }
     
     client.stop();
+  }
+
+  return httpCode;
+}
+
+void notifyFaceChanged(int currentFace) {
+  int _try = 0;
+
+  while (_try < NOTIFY_FACE_RETRIES) {
+    PRINT("NOTIFYING FACE CHANGE TRY ");
+    PRINTLN(_try);
+    
+    int httpCode = notifyFaceChangedAux(currentFace);
+
+    if (httpCode == 200) {
+      PRINTLN("FACE CHANGED NOTIFIED!");
+      return;
+    } else if (httpCode == 401) {
+      PRINTLN("UNAUTHORIZED CALL.. AUTHENTICATING AND TRYING AGAIN!");
+      authenticate();
+    } else {
+      PRINT("FACE CHANGED FAILED WITH STATUS ");
+      PRINTLN(httpCode);
+    }
+
+    _try++;
   }
 }
 
@@ -349,11 +407,11 @@ void mpu_loop() {
     mpu.dmpGetGravity(&gravity, &q);
 
     if (faceCheckTimer <= (millis() - FACE_CHECK_DELAY)) {
+      faceCheckTimer = millis();      
       int currentFace = getCurrentFace(&gravity);
       if (isFaceChanged(currentFace)) {
 	notifyFaceChanged(currentFace);
       }
-      faceCheckTimer = millis();
 
 #ifdef OUTPUT_READABLE_GRAVITY
       PRINT("gravity\t");
@@ -367,25 +425,26 @@ void mpu_loop() {
   }
 }
 
-void initEEPROM() {
-  strncpy(credentials.username, "", 40);
-  strncpy(credentials.password, "", 40);
+bool initEEPROM() {
+  EEPROM.begin(512);
+  EEPROM.get(0, credentials);
 
-  //EEPROM.begin(512);
-
-  //EEPROM.get(0, credentials);
-
+  PRINTLN("CURRENT USERNAME:");
+  PRINTLN(credentials.username);
   
   if (strlen(credentials.username) > 32) {
     PRINTLN("NO USERNAME FOUND, RESETTING");
+    strncpy(credentials.username, "", 40);
+    strncpy(credentials.password, "", 40);
+    return false;
   }
-  
-  PRINTLN(credentials.username);
+
+  return true;
 }
 
 void setup(void) {
-  Serial.begin(9600);  
-  //wifiManager.resetSettings();  
+  Serial.begin(9600);
+  
   initEEPROM();
 
   WiFiManager wifiManager;
@@ -395,20 +454,24 @@ void setup(void) {
   WiFiManagerParameter ttPassword("ttpassword", "TimeTrackerDice password", credentials.password, 40);
   wifiManager.addParameter(&ttPassword);
 
-  wifiManager.autoConnect(DEVICE_NAME);
+  bool connected = wifiManager.autoConnect(DEVICE_NAME);
 
-  PRINT(F("WiFi connected! IP address: "));
-  PRINTLN(WiFi.localIP());
+  if (connected) {
+    PRINT(F("WiFi connected! IP address: "));
+    PRINTLN(WiFi.localIP());
   
-  PRINTLN(ttUsername.getValue());
+    PRINTLN(ttUsername.getValue());
   
-  //strncpy(credentials.username, ttUsername.getValue(), 40);
-  //strncpy(credentials.password, ttPassword.getValue(), 40);
-  strncpy(credentials.username, "mariotti", 40);
-  strncpy(credentials.password, "demo", 40);
-  
-  authenticate(); 
-  mpuSetup();
+    strncpy(credentials.username, ttUsername.getValue(), 40);
+    strncpy(credentials.password, ttPassword.getValue(), 40);
+
+    authenticate(); 
+    
+    mpuSetup();
+
+    EEPROM.put(0, credentials);
+    EEPROM.commit();    
+  }
 }
 
 void loop(void) {
@@ -417,5 +480,7 @@ void loop(void) {
     ESP.reset();
   }
 
+  //  if (authenticated) {
   mpu_loop();
+    //}
 }
