@@ -1,14 +1,40 @@
 {% extends 'mapper/base.html' %}
 {% load bootstrap4 %}
-
+{% load static %}
 {% block title %}django-bootstrap4{% endblock %}
 
 {% block content %}
-This is <em>bootstrap4</em> for <strong>Django</strong>.
-<ul>
-{% for project in projects %}
-    <li>{{ project.name }}</li>
-{% endfor %}
-</ul>
-{% endblock %}
 
+<script src="{% static "js/bootstrap3-typeahead.min.js" %}"></script>
+
+<a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>
+
+<input type="text"
+       class="form-control typeahead border-primary"
+       name="actions"
+       id="actions"
+       placeholder="Action"
+       data-provide="typeahead"
+       autocomplete="off">
+
+
+<input type="text"
+       class="form-control typeahead border-primary"
+       name="projects"
+       id="projects"
+       placeholder="Toggl project"
+       data-provide="typeahead"
+       autocomplete="off">
+
+
+<script>
+  $.get("{% url 'toggl-projects' %}", function(data){
+      $("#projects").typeahead({ source:data });
+  },'json');
+
+  $.get("{% url 'toggl-actions' %}", function(data) {
+      $("#actions").typeahead({ source:data });
+  },'json');
+</script>
+
+{% endblock %}

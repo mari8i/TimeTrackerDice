@@ -15,6 +15,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 
 from toggl.TogglPy import Toggl
 from dal import autocomplete
+from .models import TogglAction
+from django.http import JsonResponse
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +33,13 @@ def face_changed(request, face):
         toggl.stopTimeEntry(currentTimer['data']['id'])
     else:
         mapping = request.user.togglmapping_set.get(face=face)
-                
+
         # You can get your project pid in toggl.com->Projects->(select your project)
         # and copying the last number of the url
         toggl.startTimeEntry(mapping.action.name, mapping.action.project)
-    
+
     return Response("Hello World")
 
-#@login_required
 class HomePageView(LoginRequiredMixin, TemplateView):
     template_name = "mapper/home.html"
 
@@ -46,16 +47,32 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         context = super(HomePageView, self).get_context_data(**kwargs)
         #messages.info(self.request, "hello http://example.com")
         return context
-    
 
-class ProjectsAutocomplete(LoginRequiredMixin, autocomplete.Select2QuerySetView):
-    
-    def get_queryset(self):
-        toggl = Toggl()
-        toggl.setAPIKey(self.request.user.togglcredentials.api_key)
-        
-        default_workspace = toggl.getWorkspaces()[0]    
-        projects = toggl.request("https://www.toggl.com/api/v8/workspaces/" +
-                                 str(default_workspace['id']) +
-                                 "/projects")
-        return projects
+
+@login_required
+def get_toggl_projects(request):
+    toggl = Toggl()
+    toggl.setAPIKey(request.user.togglcredentials.api_key)
+
+    default_workspace = toggl.getWorkspaces()[0]
+    projects = toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/projects")
+
+    data = [
+        {
+            "id": p['id'],
+            "name": p['name']
+        }
+        for p in projects]
+
+    return JsonResponse(data, safe=False)
+
+@login_required
+def get_existing_actions(request):
+    data = [
+        {
+            "id": a.id,
+            "name": a.name
+        }
+        for a in TogglAction.objects.filter(user=request.user)]
+
+    return JsonResponse(data, safe=False)

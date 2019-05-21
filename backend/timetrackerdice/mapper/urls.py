@@ -8,8 +8,8 @@ from mapper import views
 urlpatterns = [
     path('faces/<int:face>', views.face_changed),
     path('home', views.HomePageView.as_view(), name='home'),
-    path('projects', views.ProjectsAutocomplete.as_view(),
-         name='projects-autocomplete'),    
+    path('toggl/projects', views.get_toggl_projects, name='toggl-projects'),
+    path('toggl/actions', views.get_existing_actions, name='toggl-actions'),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

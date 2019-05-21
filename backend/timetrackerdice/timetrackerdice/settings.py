@@ -44,13 +44,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     'rest_framework',
     'rest_framework.authtoken',
     'dal',
-    'dal_select2',    
+    'dal_select2',
     'bootstrap4',
-    
+
     'mapper',
 ]
 
@@ -134,6 +134,10 @@ LOGIN_REDIRECT_URL = '/home'
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+
+STATICFILES_DIRS = (
+    "/Users/Mariotti/Devel/mari8i/TimeTrackerDice/backend/timetrackerdice/static/",
+)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
