@@ -29,12 +29,22 @@
 
 <script>
   $.get("{% url 'toggl-projects' %}", function(data){
-      $("#projects").typeahead({ source:data });
-  },'json');
+      $("#projects").typeahead({
+          source:data,
+          showHintOnFocus: "all",
+          autoSelect: true,
+          afterSelect: function(res) {
+              console.log(res);
+          },
+          //updater: function(res) {
+          //console.log(',,', res);
+          //}
+      });
+  }, 'json');
 
   $.get("{% url 'toggl-actions' %}", function(data) {
       $("#actions").typeahead({ source:data });
-  },'json');
+  }, 'json');
 </script>
 
 {% endblock %}
