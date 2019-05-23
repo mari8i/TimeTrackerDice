@@ -8,43 +8,67 @@
 <script src="{% static "js/bootstrap3-typeahead.min.js" %}"></script>
 
 <a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>
+<form>
+  <div class="row">
+    <div class="col">      
+      <input type="text"
+	     class="form-control typeahead border-primary"
+	     name="actions"
+	     id="actions"
+	     placeholder="Action"
+	     data-provide="typeahead"
+	     autocomplete="off">
+    </div>
+    <div class="col">      
+      <input type="text"
+	     class="form-control typeahead border-primary"
+	     name="projects"
+	     id="projects"
+	     placeholder="Toggl project"
+	     data-provide="typeahead"
+	     autocomplete="off">
+    </div>
+  </div>
 
-<input type="text"
-       class="form-control typeahead border-primary"
-       name="actions"
-       id="actions"
-       placeholder="Action"
-       data-provide="typeahead"
-       autocomplete="off">
-
-
-<input type="text"
-       class="form-control typeahead border-primary"
-       name="projects"
-       id="projects"
-       placeholder="Toggl project"
-       data-provide="typeahead"
-       autocomplete="off">
-
+  <input type="hidden" value="0" id="projectid" name="projectid">
+</form>
 
 <script>
-  $.get("{% url 'toggl-projects' %}", function(data){
-      $("#projects").typeahead({
-          source:data,
-          showHintOnFocus: "all",
-          autoSelect: true,
-          afterSelect: function(res) {
-              console.log(res);
-          },
-          //updater: function(res) {
-          //console.log(',,', res);
-          //}
-      });
-  }, 'json');
 
-  $.get("{% url 'toggl-actions' %}", function(data) {
-      $("#actions").typeahead({ source:data });
-  }, 'json');
+$.get("{% url 'toggl-actions' %}", function(data) {
+    $("#actions").typeahead({ source:data });
+}, 'json');
+
+$.get("{% url 'toggl-projects' %}", function(data){
+    let $input = $("#projects");
+    
+    $input.typeahead({
+        source:data,
+        showHintOnFocus: "all",
+        autoSelect: true,
+        afterSelect: function(res) {
+            console.log(res);
+            $('#projectid').val(res.id);  
+        }, 
+    });
+
+
+    $input.change(function() {
+	var current = $input.typeahead("getActive");
+	if (current) {
+	    // Some item from your model is active!
+	    if (current.name == $input.val()) {
+		// This means the exact match is found. Use toLowerCase() if you want case insensitive match.
+	    } else {
+		// This means it is only a partial match, you can either add a new item
+		// or take the active if you don't want new items
+	    }
+	} else {
+	    // Nothing is active so it is a new value (or maybe empty value)
+	}
+    });
+    
+}, 'json');
 </script>
 
 {% endblock %}

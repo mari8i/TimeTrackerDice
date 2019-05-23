@@ -136,7 +136,7 @@ LOGIN_REDIRECT_URL = '/home'
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = (
-    "/Users/Mariotti/Devel/mari8i/TimeTrackerDice/backend/timetrackerdice/static/",
+    "static/",
 )
 
 REST_FRAMEWORK = {
