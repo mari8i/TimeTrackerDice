@@ -1,74 +1,98 @@
 {% extends 'mapper/base.html' %}
 {% load bootstrap4 %}
 {% load static %}
-{% block title %}django-bootstrap4{% endblock %}
+
+{% block title %}Time Tracker Dice!{% endblock %}
 
 {% block content %}
 
 <script src="{% static "js/bootstrap3-typeahead.min.js" %}"></script>
 
-<a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>
-<form>
+<!-- <a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>-->
+
+{% for mapping in mappings %}
+
+<form method="POST" id="form-face-{{ face }}">
+  {% csrf_token %}
+  <input type="hidden" name="face" id="face{{ mapping.face }}" value="{{ mapping.face }}">
+  
   <div class="row">
-    <div class="col">      
+    <div class="col col-md-1">
+      <h1>{{ mapping.face }}</h1>
+    </div>
+    <div class="col col-md-6">      
       <input type="text"
 	     class="form-control typeahead border-primary"
-	     name="actions"
-	     id="actions"
+	     name="action"
+	     id="action{{ mapping.face }}"
 	     placeholder="Action"
 	     data-provide="typeahead"
-	     autocomplete="off">
+	     autocomplete="off"
+	     value="{{ mapping.action.name }}">
     </div>
-    <div class="col">      
+    <div class="col col-md-4">      
       <input type="text"
 	     class="form-control typeahead border-primary"
-	     name="projects"
-	     id="projects"
+	     name="project"
+	     id="project{{ mapping.face }}"
 	     placeholder="Toggl project"
 	     data-provide="typeahead"
-	     autocomplete="off">
+	     autocomplete="off"
+	     value="{{ mapping.action.project_name }}">
+    </div>
+    
+    <div class="col col-md-1">
+      <button type="submit" class="btn btn-primary">Salva</button>
     </div>
   </div>
-
-  <input type="hidden" value="0" id="projectid" name="projectid">
 </form>
+
+{% endfor %}
 
 <script>
 
-$.get("{% url 'toggl-actions' %}", function(data) {
-    $("#actions").typeahead({ source:data });
-}, 'json');
+  let registerActionInput = function(face, data) {
+      let $actionInput = $("#action" + face);
+      $actionInput.typeahead({
+	  source: data,
+	  afterSelect: function(res) {
+	      if (res.project) {
+		  $("#project" + face).val(res.project);
+	      }
+          }
+      });
 
-$.get("{% url 'toggl-projects' %}", function(data){
-    let $input = $("#projects");
+      $actionInput.on("click", function () {
+	  $(this).select();
+      });
+  }
+
+  let registerProjectInput = function(face, data) {
+      let $projectInput = $("#project" + face);
+      
+      $projectInput.typeahead({
+          source:data,
+          showHintOnFocus: "all",
+          autoSelect: true
+      });
+      
+      $projectInput.on("click", function () {
+	  $(this).select();
+      });
+  }
+  
+  $.get("{% url 'toggl-actions' %}", function(data) {      
+      {% for mapping in mappings %}      
+      registerActionInput({{ mapping.face }}, data);
+      {% endfor %}
+  }, 'json');
+
+  $.get("{% url 'toggl-projects' %}", function(data){
+      {% for mapping in mappings %}            
+      registerProjectInput({{ mapping.face }}, data);
+      {% endfor %}
+  }, 'json');
     
-    $input.typeahead({
-        source:data,
-        showHintOnFocus: "all",
-        autoSelect: true,
-        afterSelect: function(res) {
-            console.log(res);
-            $('#projectid').val(res.id);  
-        }, 
-    });
-
-
-    $input.change(function() {
-	var current = $input.typeahead("getActive");
-	if (current) {
-	    // Some item from your model is active!
-	    if (current.name == $input.val()) {
-		// This means the exact match is found. Use toLowerCase() if you want case insensitive match.
-	    } else {
-		// This means it is only a partial match, you can either add a new item
-		// or take the active if you don't want new items
-	    }
-	} else {
-	    // Nothing is active so it is a new value (or maybe empty value)
-	}
-    });
-    
-}, 'json');
 </script>
 
 {% endblock %}
