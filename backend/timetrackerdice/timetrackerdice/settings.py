@@ -139,7 +139,7 @@ STATICFILES_DIRS = (
     "static/",
 )
 
-STATIC_ROOT = '/var/www/TimeTrackerDice/backend/timetrackerdice/static/'
+STATIC_ROOT = '/var/www/TimeTrackerDice/static/'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
