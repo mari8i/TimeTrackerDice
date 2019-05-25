@@ -12,3 +12,19 @@ Content-Type: application/json
 POST http://localhost:8000/faces/0
 Content-Type: application/json
 Authorization: Token 33905f0e31a77bc72e7570816ca7c76de066e74a
+
+
+#
+# LOGIN
+POST https://timetracker.mariotti.dev/login/
+Content-Type: application/json
+{
+	"username": "mariotti",
+	"password": "mh@0e7Vz"
+}
+
+# Change Face
+POST https://timetracker.mariotti.dev/faces/1
+Content-Type: application/json
+Authorization: Token ad3286094c35fa6ac4b8b48d3a526b104b2082f8
+

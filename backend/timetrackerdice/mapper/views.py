@@ -15,8 +15,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 
 from toggl.TogglPy import Toggl
 from dal import autocomplete
-from .models import TogglAction, TogglMapping
+from .models import TogglAction, TogglMapping, TogglCredentials
 from django.http import JsonResponse
+import urllib
 
 from functools import lru_cache
 
@@ -32,7 +33,8 @@ def face_changed(request, face):
 
     if face == 0:
         currentTimer = toggl.currentRunningTimeEntry()
-        toggl.stopTimeEntry(currentTimer['data']['id'])
+        if currentTimer and currentTimer['data'] and currentTimer['data']['id']:
+            toggl.stopTimeEntry(currentTimer['data']['id'])
     else:
         mapping = request.user.togglmapping_set.get(face=face)
 
@@ -78,12 +80,20 @@ class HomePageView(LoginRequiredMixin, TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super(HomePageView, self).get_context_data(**kwargs)
-        #messages.info(self.request, "hello http://example.com")
-        projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)
-        
-        context['mappings'] = [add_project_name_to_mapping(projects, mapping)
-                               for mapping in TogglMapping.objects.filter(user=self.request.user).order_by('face')]
-        
+        context['has_toggl_credentials'] = bool(self.request.user.togglcredentials.api_key)
+
+        if self.request.user.togglcredentials.api_key:
+            try:
+                projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)        
+                context['mappings'] = [add_project_name_to_mapping(projects, mapping)
+                                       for mapping in TogglMapping.objects.filter(user=self.request.user).order_by('face')]
+            except urllib.error.HTTPError as e:
+                if e.getcode() == 403:
+                    context['has_toggl_credentials'] = False
+                    messages.error(self.request, "Toggl Credentials not valid")
+                else:
+                    messages.error(self.request, "Error connecting to Toggl")
+                            
         return context
 
 @lru_cache(maxsize=None)
@@ -122,6 +132,14 @@ def get_existing_actions(request):
 
     return JsonResponse(data, safe=False)
 
+@login_required
+def save_toggl_api_key(request):
+
+    TogglCredentials.objects \
+                    .filter(user=request.user) \
+                    .update(api_key=request.POST['toggl_api_key'])
+    
+    return redirect('home')
 
 def find_project_name_by_id(projects, project_id):
     if project_id is None:

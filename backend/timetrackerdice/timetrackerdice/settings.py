@@ -27,13 +27,14 @@ if BOOTSTRAP4_FOLDER not in sys.path:
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '8h^*egm=r)m0fpt^^6d)jd*tbq-x#8!v5hnd%2+m!w+kfc0pix'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+print(os.environ.get("TIME_TRACKER_PROD"))
+DEBUG = os.environ.get("TIME_TRACKER_PROD", False) != 'True'
+print("DEBUG: " + str(DEBUG))
 
 if DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
-    ALLOWED_HOSTS = []
+    ALLOWED_HOSTS = ['timetracker.mariotti.dev']
 
 # Application definition
 
@@ -47,8 +48,6 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'rest_framework.authtoken',
-    'dal',
-    'dal_select2',
     'bootstrap4',
 
     'mapper',

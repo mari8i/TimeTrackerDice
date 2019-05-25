@@ -19,9 +19,18 @@ THE SOFTWARE.
 ===============================================
 */
 
+/*
+ * WARNING:
+ * Remember to comment the ISR not in IRAM error in:
+ * ~/.platformio/packages/framework-arduinoespressif8266@2.20501.190515/cores/esp8266/core_esp8266_wiring_digital.cpp
+ */
+
+
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
-#include <WiFiClient.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
+
 #include <WiFiManager.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
@@ -31,10 +40,10 @@ THE SOFTWARE.
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 
-#define PRINTLN(x) Serial.println(x)
-#define PRINT(x) Serial.print(x)
-//#define PRINTLN(x)
-//#define PRINT(x)
+//#define PRINTLN(x) Serial.println(x)
+//#define PRINT(x) Serial.print(x)
+#define PRINTLN(x)
+#define PRINT(x)
 
 #define INTERRUPT_PIN D5
 
@@ -43,12 +52,12 @@ THE SOFTWARE.
 #define FACES_NUMBER                9
 #define FACE_CHANGE_DELAY_THRESHOLD 2000UL
 #define FACE_CHECK_DELAY            500UL
-#define JSON_BUFFER_SIZE            200 
+#define JSON_BUFFER_SIZE            200
 
 #define HTTP_CONNECTION_TIMEOUT     10000UL
 
 #define AUTHENTICATION_RETRIES      3
-#define NOTIFY_FACE_RETRIES         1
+#define NOTIFY_FACE_RETRIES         3
 
 const VectorFloat faces[FACES_NUMBER] =
   {
@@ -64,8 +73,10 @@ const VectorFloat faces[FACES_NUMBER] =
   };
 
 const char DEVICE_NAME[] = "TimeTrackerDice";
-const String HOSTNAME = "192.168.1.143";
-const int PORT = 8000;
+const String HOSTNAME = "timetracker.mariotti.dev";
+const uint8_t fingerprint[20] = {0x47, 0xD2, 0x02, 0xDA, 0xD0, 0xE7, 0xFF, 0xE6, 0xE7, 0x04, 0xB6, 0x4C, 0x2D, 0x3A, 0x51, 0x7F, 0x77, 0x8E, 0x7E, 0x29};
+
+const int PORT = 443;
 
 MPU6050 mpu;
 
@@ -83,13 +94,13 @@ unsigned long faceCheckTimer = 0UL;
 String token = "";
 bool authenticated = false;
 
-struct { 
+struct {
   char username[40] = "";
   char password[40] = "";
 } credentials;
 
 void resetWifi() {
-  PRINTLN("RESETTING WIFI SETTINGS");  
+  PRINTLN("RESETTING WIFI SETTINGS");
   WiFi.disconnect(true);
   delay(3000);
   ESP.reset();
@@ -188,76 +199,9 @@ bool isFaceChanged(int currentFace) {
   return faceChanged;
 }
 
-bool waitClientResponse(WiFiClient client) {
-  unsigned long currentMillis = millis(), previousMillis = millis();
-
-  while (client.connected() && !client.available()) {
-    if ((currentMillis - previousMillis) > HTTP_CONNECTION_TIMEOUT) {
-      PRINTLN("Timeout");
-      client.stop();     
-      return false;
-    }
-      
-    currentMillis = millis();
-  }
-
-  return true;
-}
-
-int readClientResponseHttpCode(WiFiClient client) {
-  while (client.connected() || client.available()) {
-    if (client.available()) {
-      String line = client.readStringUntil('\n');
-      PRINTLN(line);
-      
-      if (line.startsWith("HTTP/1.1")) {
-	return line.substring(9, 12).toInt();
-      }
-    }
-  }
-
-  return -1;
-}
-
-String readClientResponsePayload(WiFiClient client) {
-  String payload = "";
-  bool inPayload = false;
-  while (client.connected() || client.available()) {
-    if (client.available()) {
-      String line = client.readStringUntil('\n');
-      PRINTLN(line);
-      
-      if (line.startsWith("Content-Length")) {
-	inPayload = true;
-      } else if (inPayload) {
-	payload += line;
-      }
-    }
-  }
-
-  return payload;
-}
-
-void clientPostData(WiFiClient client, String url, String postData, bool authenticated) {
-  client.println("POST " + url + " HTTP/1.1");
-  client.println("Host: " + HOSTNAME);
-  client.println("Cache-Control: no-cache");
-  client.println("Content-Type: application/json");
-  
-  if (authenticated) {
-    client.println("Authorization: Token " + token);
-  }
-  
-  client.print("Content-Length: ");
-  client.println(postData.length());
-  client.println();
-  client.println(postData);
-  client.flush();  // Don't waste your life: always flush  
-}
-
 bool authenticateAux() {
   bool result = false;
-  
+
   PRINT(F("Authenticating with credentials: "));
   PRINT(String(credentials.username));
   PRINT(F(" - "));
@@ -274,36 +218,35 @@ bool authenticateAux() {
     PRINTLN(postData);
   }
 
-  WiFiClient client;
+  int httpCode = -1;
+  String payload;
 
-  if (client.connect(HOSTNAME, PORT)) {
-    clientPostData(client, "/login/", postData, false);
+  std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+  client->setFingerprint(fingerprint);
 
-    bool response = waitClientResponse(client);
-
-    if (response) {
-      int httpCode = readClientResponseHttpCode(client);
-      String payload = readClientResponsePayload(client);
+  HTTPClient https;
+  if (https.begin(*client, "https://" + HOSTNAME + "/login/")) {
+    https.addHeader("Content-Type", "application/json");
+    httpCode = https.POST(postData);
+    payload = https.getString();
+    https.end();
+  }
   
-      PRINTLN(httpCode);
-      PRINTLN(payload);
+  PRINTLN(httpCode);
+  PRINTLN(payload);
 
-      if (httpCode == 200) {
-	StaticJsonDocument<JSON_BUFFER_SIZE> doc;    
-	deserializeJson(doc, payload);    
-	token = String(doc["token"].as<String>());
+  if (httpCode == 200) {
+    StaticJsonDocument<JSON_BUFFER_SIZE> doc;
+    deserializeJson(doc, payload);
+    token = String(doc["token"].as<String>());
 
-	PRINTLN(F("AUTHENTICATED! TOKEN: "));
-	PRINTLN(token);
-	authenticated = true;
-	result = true;
-      } else {
-	PRINTLN("NOT AUTHENTICATED");
-	authenticated = false;
-      }
-    }
-    
-    client.stop();
+    PRINTLN(F("AUTHENTICATED! TOKEN: "));
+    PRINTLN(token);
+    authenticated = true;
+    result = true;
+  } else {
+    PRINTLN("NOT AUTHENTICATED");
+    authenticated = false;
   }
 
   return result;
@@ -329,25 +272,25 @@ int notifyFaceChangedAux(int currentFace) {
   PRINTLN(currentFace);
 
   int httpCode = -1;
+  String payload;
+  String postData = "HelloWorld";
+
+  std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+  client->setFingerprint(fingerprint);
+
+  HTTPClient https;
+  PRINT("AUTHENTICATING WITH: ");
+  PRINTLN(token);
   
-  WiFiClient client;
-  if (client.connect(HOSTNAME, 8000)) {
-    String postData = "HelloWorld";
-    
-    clientPostData(client, "/faces/" + String(currentFace), postData, true);
+  if (https.begin(*client, "https://" + HOSTNAME + "/faces/" + String(currentFace))) {  // HTTPS
+    https.addHeader("Authorization", "Token " + token);  
+    https.addHeader("Content-Type", "application/json");
 
-    bool response = waitClientResponse(client);
+    httpCode = https.POST(postData);
+    payload = https.getString();
 
-    if (response) {
-      httpCode = readClientResponseHttpCode(client);
-      String payload = readClientResponsePayload(client);
-
-      PRINTLN(httpCode);
-      PRINTLN(payload);
-    }
-    
-    client.stop();
-  }
+    https.end();
+  } 
 
   return httpCode;
 }
@@ -358,7 +301,7 @@ void notifyFaceChanged(int currentFace) {
   while (_try < NOTIFY_FACE_RETRIES) {
     PRINT("NOTIFYING FACE CHANGE TRY ");
     PRINTLN(_try);
-    
+
     int httpCode = notifyFaceChangedAux(currentFace);
 
     if (httpCode == 200) {
@@ -395,7 +338,7 @@ void mpu_loop() {
   } else if (mpuIntStatus & 0x02) {
     Quaternion q;
     VectorFloat gravity;
-    
+
     while (fifoCount < packetSize) {
       fifoCount = mpu.getFIFOCount();
     }
@@ -407,7 +350,7 @@ void mpu_loop() {
     mpu.dmpGetGravity(&gravity, &q);
 
     if (faceCheckTimer <= (millis() - FACE_CHECK_DELAY)) {
-      faceCheckTimer = millis();      
+      faceCheckTimer = millis();
       int currentFace = getCurrentFace(&gravity);
       if (isFaceChanged(currentFace)) {
 	notifyFaceChanged(currentFace);
@@ -431,7 +374,7 @@ bool initEEPROM() {
 
   PRINTLN("CURRENT USERNAME:");
   PRINTLN(credentials.username);
-  
+
   if (strlen(credentials.username) > 32) {
     PRINTLN("NO USERNAME FOUND, RESETTING");
     strncpy(credentials.username, "", 40);
@@ -444,11 +387,11 @@ bool initEEPROM() {
 
 void setup(void) {
   Serial.begin(9600);
-  
+
   initEEPROM();
 
   WiFiManager wifiManager;
-  
+
   WiFiManagerParameter ttUsername("ttusername", "TimeTrackerDice username", credentials.username, 40);
   wifiManager.addParameter(&ttUsername);
   WiFiManagerParameter ttPassword("ttpassword", "TimeTrackerDice password", credentials.password, 40);
@@ -459,18 +402,18 @@ void setup(void) {
   if (connected) {
     PRINT(F("WiFi connected! IP address: "));
     PRINTLN(WiFi.localIP());
-  
+
     PRINTLN(ttUsername.getValue());
-  
+
     strncpy(credentials.username, ttUsername.getValue(), 40);
     strncpy(credentials.password, ttPassword.getValue(), 40);
 
-    authenticate(); 
+    authenticate();
     
     mpuSetup();
 
     EEPROM.put(0, credentials);
-    EEPROM.commit();    
+    EEPROM.commit();
   }
 }
 

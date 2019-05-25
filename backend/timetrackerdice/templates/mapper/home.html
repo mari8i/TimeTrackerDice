@@ -6,6 +6,8 @@
 
 {% block content %}
 
+{% if has_toggl_credentials %}
+
 <script src="{% static "js/bootstrap3-typeahead.min.js" %}"></script>
 
 <!-- <a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>-->
@@ -95,4 +97,26 @@
     
 </script>
 
+{% else %}
+
+<form method="POST" id="form-set-credentials" action="{% url 'toggl-credentials' %}">
+  {% csrf_token %}
+
+  <div class="row">
+    <div class="col col-xs-10 col-md-10">      
+      <input type="text"
+	     class="form-control border-primary"
+	     name="toggl_api_key"
+	     placeholder="Toggl API KEY">
+    </div>
+    
+    <div class="col col-xs-2 col-md-2">
+      <button type="submit" class="btn btn-primary btn-block">Salva</button>
+    </div>
+  </div>
+</form>
+
+{% endif %}
+
 {% endblock %}
+

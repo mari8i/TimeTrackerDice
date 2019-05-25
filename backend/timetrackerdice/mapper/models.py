@@ -8,7 +8,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 
 class TogglCredentials(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)    
-    api_key = models.CharField(max_length=64)
+    api_key = models.CharField(max_length=64, blank=True, default="")
 
     def __str__(self):
         return 'Credentials of user: ' + self.user.username
