@@ -89,12 +89,24 @@ WSGI_APPLICATION = 'timetrackerdice.wsgi.application'
 
 use_mysql = os.environ.get('USE_MYSQL', False) == 'True'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+if use_mysql: 
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.environ['MYSQL_DATABASE'],
+            'USER': os.environ['MYSQL_USERNAME'],
+            'PASSWORD': os.environ['MYSQL_PASSWORD'],
+            'HOST': os.environ['MYSQL_HOST'],
+            'PORT': os.environ['MYSQL_PORT']
+        }
+    }   
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
     }
-}
 
 
 # Password validation
