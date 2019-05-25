@@ -87,6 +87,8 @@ WSGI_APPLICATION = 'timetrackerdice.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
+use_mysql = os.environ.get('USE_MYSQL', False) == 'True'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',

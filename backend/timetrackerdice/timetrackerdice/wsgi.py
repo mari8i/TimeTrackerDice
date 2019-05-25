@@ -11,6 +11,16 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
+envvars = ['TIME_TRACKER_PROD', 'USE_MYSQL', 'MYSQL_HOST', 'MYSQL_USERNAME', 'MYSQL_PASSWORD', 'MYSQL_DATABASE']
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'timetrackerdice.settings')
 
-application = get_wsgi_application()
+def application(environ, start_response):
+    for envvar in envvars:    
+        os.environ[envvar] = environ[envvar]
+
+    _application = get_wsgi_application()
+    return _application(environ, start_response)
+
+#application = get_wsgi_application()
+
