@@ -16,8 +16,9 @@ envvars = ['TIME_TRACKER_PROD', 'USE_MYSQL', 'MYSQL_HOST', 'MYSQL_USERNAME', 'MY
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'timetrackerdice.settings')
 
 def application(environ, start_response):
-    for envvar in envvars:    
-        os.environ[envvar] = environ[envvar]
+    for envvar in envvars:
+        if envvar in environ:
+            os.environ[envvar] = environ[envvar]
 
     _application = get_wsgi_application()
     return _application(environ, start_response)
