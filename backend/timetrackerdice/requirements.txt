@@ -4,5 +4,5 @@ markdown
 django-filter
 TogglPy
 django-bootstrap4
-django-autocomplete-light
+mysqlclient
 
