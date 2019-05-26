@@ -18,8 +18,9 @@ from dal import autocomplete
 from .models import TogglAction, TogglMapping, TogglCredentials
 from django.http import JsonResponse
 import urllib
+from lru import lazy_cache
 
-from functools import lru_cache
+#from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -48,33 +49,31 @@ class HomePageView(LoginRequiredMixin, TemplateView):
     template_name = "mapper/home.html"
     
     def post(self, request):
-        action = request.POST['action']
-        project = request.POST['project']
-        face = request.POST['face']
-        
         projects = fetch_toggl_projects(request.user.togglcredentials.api_key)
-
-        try:
-            project_id = next(p['id']
-                              for p in projects
-                              if p['name'] == project)
-        except:
-            project_id = None
-
-        try:
-            toggl_action = TogglAction.objects.get(user=request.user, name=action)            
-            toggl_action.project = project_id
-        except TogglAction.DoesNotExist:
-            toggl_action = TogglAction(user=request.user, name=action, project=project_id)
+        for face in range(1, 9):
+            action = request.POST['action[' + str(face) + ']']
+            project = request.POST['project[' + str(face) + ']']
             
-        toggl_action.save()
+            try:
+                project_id = next(p['id']
+                                  for p in projects
+                                  if p['name'] == project)
+            except:
+                project_id = None
 
-        toggl_mapping = TogglMapping.objects.get(user=request.user, face=face)
-        toggl_mapping.action = toggl_action
-        toggl_mapping.save()
-        
-        
-        messages.info(self.request, "Action for face " + str(face) + " saved!")
+            try:
+                toggl_action = TogglAction.objects.get(user=request.user, name=action)            
+                toggl_action.project = project_id
+            except TogglAction.DoesNotExist:
+                toggl_action = TogglAction(user=request.user, name=action, project=project_id)
+
+            toggl_action.save()
+
+            toggl_mapping = TogglMapping.objects.get(user=request.user, face=face)
+            toggl_mapping.action = toggl_action
+            toggl_mapping.save()
+            
+        #messages.info(self.request, "Actions saved!")
         
         return redirect('home')
     
@@ -96,7 +95,34 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                             
         return context
 
-@lru_cache(maxsize=None)
+
+class SettingsPageView(LoginRequiredMixin, TemplateView):
+    template_name = "mapper/settings.html"
+    
+    def post(self, request):
+        TogglCredentials.objects \
+                        .filter(user=request.user) \
+                        .update(api_key=request.POST['toggl_api_key'])
+            
+        return redirect('settings')
+    
+    def get_context_data(self, **kwargs):
+        context = super(SettingsPageView, self).get_context_data(**kwargs)
+        context['toggl_api_key'] = self.request.user.togglcredentials.api_key
+
+        if self.request.user.togglcredentials.api_key:
+            try:
+                projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)
+            except urllib.error.HTTPError as e:
+                if e.getcode() == 403:                    
+                    messages.error(self.request, "Toggl Credentials not valid")
+                else:
+                    messages.error(self.request, "Error connecting to Toggl")
+                            
+        return context
+
+    
+@lazy_cache(maxsize=128, expires=60)
 def fetch_toggl_projects(api_key):
     logger.info("Fetching toggl projects for api_key: " + api_key)
     toggl = Toggl()
@@ -132,15 +158,6 @@ def get_existing_actions(request):
 
     return JsonResponse(data, safe=False)
 
-@login_required
-def save_toggl_api_key(request):
-
-    TogglCredentials.objects \
-                    .filter(user=request.user) \
-                    .update(api_key=request.POST['toggl_api_key'])
-    
-    return redirect('home')
-
 def find_project_name_by_id(projects, project_id):
     if project_id is None:
         return None
@@ -157,3 +174,4 @@ def add_project_name_to_mapping(projects, mapping):
         mapping.action.project_name = find_project_name_by_id(projects, mapping.action.project) or ""
         
     return mapping
+

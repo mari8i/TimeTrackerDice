@@ -1,0 +1,27 @@
+{% extends 'mapper/base_navbar.html' %}
+{% load bootstrap4 %}
+{% load static %}
+
+{% block title %}Time Tracker Dice!{% endblock %}
+
+{% block content %}
+
+<form method="POST" id="form-set-credentials">
+  {% csrf_token %}
+
+  <div class="row">
+    <div class="col col-xs-10 col-md-10">
+      <input type="text"
+	     class="form-control border-primary"
+	     name="toggl_api_key"
+	     placeholder="Toggl API KEY"
+	     value="{{ toggl_api_key }}">
+    </div>
+
+    <div class="col col-xs-2 col-md-2">
+      <button type="submit" class="btn btn-primary btn-block">Salva</button>
+    </div>
+  </div>
+</form>
+
+{% endblock %}

@@ -1,4 +1,4 @@
-{% extends 'mapper/base.html' %}
+{% extends 'mapper/base_navbar.html' %}
 {% load bootstrap4 %}
 {% load static %}
 
@@ -6,50 +6,59 @@
 
 {% block content %}
 
-{% if has_toggl_credentials %}
-
 <script src="{% static "js/bootstrap3-typeahead.min.js" %}"></script>
 
 <!-- <a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>-->
 
-{% for mapping in mappings %}
-
-<form method="POST" id="form-face-{{ face }}">
+<form method="POST" id="form-faces">
   {% csrf_token %}
-  <input type="hidden" name="face" id="face{{ mapping.face }}" value="{{ mapping.face }}">
+  <div class="row">
+    <div class="col col-xs-12 m-2">
+      <button type="submit" class="btn btn-success btn-lg btn-block p-1" style="font-size: 1.5em; font-weight: bolder;">SAVE</button>
+    </div>
+  </div>
+
+  <div class="row">
+    {% for mapping in mappings %}
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-6 col-xl-6 ">
+      <!--<div class="card-header">Face {{ mapping.face }}</div> -->
+      <div class="card-body text-white bg-info m-2 rounded">
+	<h2 class="card-title" style="font-weight: bold;">Face {{ mapping.face }}</h2>
+	<p class="card-text">
+	  <div class="form-group">
+	    <label for="action{{ mapping.face }}" style="font-weight: bold;">Action:</label>
+	    <input type="text"
+		   class="form-control typeahead border-primary"
+		   name="action[{{ mapping.face }}]"
+		   id="action{{ mapping.face }}"
+		   placeholder="Action"
+		   data-provide="typeahead"
+		   autocomplete="off"
+		   value="{{ mapping.action.name }}">
+	  </div>
+	  <div class="form-group">
+	    <label for="project{{ mapping.face }}" style="font-weight: bold;">Toggl project:</label>
+	    <input type="text"
+		   class="form-control typeahead border-primary"
+		   name="project[{{ mapping.face }}]"
+		   id="project{{ mapping.face }}"
+		   placeholder="Toggl project"
+		   data-provide="typeahead"
+		   autocomplete="off"
+		   value="{{ mapping.action.project_name }}">
+	  </div>
+	</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
   
   <div class="row">
-    <div class="col col-md-1">
-      <h1>{{ mapping.face }}</h1>
-    </div>
-    <div class="col col-md-6">      
-      <input type="text"
-	     class="form-control typeahead border-primary"
-	     name="action"
-	     id="action{{ mapping.face }}"
-	     placeholder="Action"
-	     data-provide="typeahead"
-	     autocomplete="off"
-	     value="{{ mapping.action.name }}">
-    </div>
-    <div class="col col-md-4">      
-      <input type="text"
-	     class="form-control typeahead border-primary"
-	     name="project"
-	     id="project{{ mapping.face }}"
-	     placeholder="Toggl project"
-	     data-provide="typeahead"
-	     autocomplete="off"
-	     value="{{ mapping.action.project_name }}">
-    </div>
-    
-    <div class="col col-md-1">
-      <button type="submit" class="btn btn-primary">Salva</button>
+    <div class="col col-xs-12 m-2">
+      <button type="submit" class="btn btn-success btn-lg btn-block p-1" style="font-size: 1.5em; font-weight: bolder;">SAVE</button>
     </div>
   </div>
 </form>
-
-{% endfor %}
 
 <script>
 
@@ -71,52 +80,30 @@
 
   let registerProjectInput = function(face, data) {
       let $projectInput = $("#project" + face);
-      
+
       $projectInput.typeahead({
           source:data,
           showHintOnFocus: "all",
           autoSelect: true
       });
-      
+
       $projectInput.on("click", function () {
 	  $(this).select();
       });
   }
-  
-  $.get("{% url 'toggl-actions' %}", function(data) {      
-      {% for mapping in mappings %}      
+
+  $.get("{% url 'toggl-actions' %}", function(data) {
+      {% for mapping in mappings %}
       registerActionInput({{ mapping.face }}, data);
       {% endfor %}
   }, 'json');
 
   $.get("{% url 'toggl-projects' %}", function(data){
-      {% for mapping in mappings %}            
+      {% for mapping in mappings %}
       registerProjectInput({{ mapping.face }}, data);
       {% endfor %}
   }, 'json');
-    
+
 </script>
 
-{% else %}
-
-<form method="POST" id="form-set-credentials" action="{% url 'toggl-credentials' %}">
-  {% csrf_token %}
-
-  <div class="row">
-    <div class="col col-xs-10 col-md-10">      
-      <input type="text"
-	     class="form-control border-primary"
-	     name="toggl_api_key"
-	     placeholder="Toggl API KEY">
-    </div>
-    
-    <div class="col col-xs-2 col-md-2">
-      <button type="submit" class="btn btn-primary btn-block">Salva</button>
-    </div>
-  </div>
-</form>
-
-{% endif %}
-
 {% endblock %}
-

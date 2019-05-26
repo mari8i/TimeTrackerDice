@@ -1,0 +1,42 @@
+{% extends 'mapper/bootstrap.html' %}
+{% load bootstrap4 %}
+
+{% block bootstrap4_content %}
+
+<div class="container">
+  <nav class="navbar navbar-expand navbar-dark bg-primary mb-3 rounded-bottom">
+    <a class="navbar-brand" href="/">Time Tracker Dice</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#time-tracker-navbar" aria-controls="time-tracker-navbar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="time-tracker-navbar">
+      <ul class="navbar-nav mr-auto">
+	<!--
+	<li class="nav-item active">
+          <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
+	</li>
+	<li class="nav-item">
+          <a class="nav-link" href="#">Link</a>
+	</li>
+	-->
+      </ul>
+
+      <ul class="navbar-nav px-3">
+	<li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="dropdown03" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Account</a>
+          <div class="dropdown-menu" aria-labelledby="dropdown03">
+            <a class="dropdown-item" href="{% url 'settings' %}">Settings</a>
+            <a class="dropdown-item" href="{% url 'logout' %}">Logout</a>
+          </div>
+	</li>      
+      </ul>
+    </div>
+  </nav>
+  
+  {% autoescape off %}{% bootstrap_messages %}{% endautoescape %}
+  
+  {% block content %}(no content){% endblock %}
+</div>
+
+{% endblock %}

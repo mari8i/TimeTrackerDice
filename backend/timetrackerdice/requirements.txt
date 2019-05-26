@@ -5,4 +5,5 @@ django-filter
 TogglPy
 django-bootstrap4
 mysqlclient
+lru-expiring-cache
 
