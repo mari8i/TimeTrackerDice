@@ -11,7 +11,7 @@ Content-Type: application/json
 # Change Face
 POST http://localhost:8000/faces/0
 Content-Type: application/json
-Authorization: Token 33905f0e31a77bc72e7570816ca7c76de066e74a
+Authorization: Token bf32087e50b8ae41e302683c72974bae42acb501
 
 
 #
@@ -24,7 +24,11 @@ Content-Type: application/json
 }
 
 # Change Face
-POST https://timetracker.mariotti.dev/faces/1
+POST https://timetracker.mariotti.dev/faces/0
 Content-Type: application/json
 Authorization: Token ad3286094c35fa6ac4b8b48d3a526b104b2082f8
 
+#
+GET https://www.toggl.com/api/v8/time_entries/current
+Content-Type: application/json
+Authorization: Basic ZDdkNGM4ZDI1NzVmODAzMzRlNzY1ZmJlMzMwYjBkZDY6YXBpX3Rva2Vu

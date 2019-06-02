@@ -2,8 +2,8 @@ django==2.2.1
 djangorestframework
 markdown
 django-filter
-TogglPy
+#TogglPy
 django-bootstrap4
 #mysqlclient
 lru-expiring-cache
-
+https://github.com/mari8i/TogglPy/archive/master.zip

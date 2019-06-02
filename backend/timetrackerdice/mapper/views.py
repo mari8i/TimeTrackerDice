@@ -151,8 +151,10 @@ def fetch_toggl_tags(api_key):
     toggl.setAPIKey(api_key)
 
     default_workspace = toggl.getWorkspaces()[0]
-
-    return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/tags")
+    toggl_tags = toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/tags")
+    
+    return [tag['name']
+            for tag in toggl_tags]
 
 @login_required
 def get_toggl_projects(request):

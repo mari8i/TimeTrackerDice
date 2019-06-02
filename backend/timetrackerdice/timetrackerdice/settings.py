@@ -27,9 +27,7 @@ if BOOTSTRAP4_FOLDER not in sys.path:
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '8h^*egm=r)m0fpt^^6d)jd*tbq-x#8!v5hnd%2+m!w+kfc0pix'
 
-print(os.environ.get("TIME_TRACKER_PROD"))
 DEBUG = os.environ.get("TIME_TRACKER_PROD", False) != 'True'
-print("DEBUG: " + str(DEBUG))
 
 if DEBUG:
     ALLOWED_HOSTS = ['*']
