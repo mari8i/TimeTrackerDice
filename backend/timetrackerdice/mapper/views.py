@@ -39,9 +39,8 @@ def face_changed(request, face):
     else:
         mapping = request.user.togglmapping_set.get(face=face)
 
-        # You can get your project pid in toggl.com->Projects->(select your project)
-        # and copying the last number of the url
-        toggl.startTimeEntry(mapping.action.name, mapping.action.project)
+        tags = mapping.action.tags.split(",") if mapping.action.tags else None
+        toggl.startTimeEntry(mapping.action.name, mapping.action.project, tags=tags)
 
     return Response("Hello World")
 
@@ -53,6 +52,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         for face in range(1, 9):
             action = request.POST['action[' + str(face) + ']']
             project = request.POST['project[' + str(face) + ']']
+            tags = request.POST['tags[' + str(face) + ']']            
             
             try:
                 project_id = next(p['id']
@@ -67,6 +67,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
             except TogglAction.DoesNotExist:
                 toggl_action = TogglAction(user=request.user, name=action, project=project_id)
 
+            toggl_action.tags = tags
             toggl_action.save()
 
             toggl_mapping = TogglMapping.objects.get(user=request.user, face=face)
@@ -129,8 +130,30 @@ def fetch_toggl_projects(api_key):
     toggl.setAPIKey(api_key)
 
     default_workspace = toggl.getWorkspaces()[0]
-    return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/projects")
     
+    return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/projects")
+
+@login_required
+def get_toggl_tags(request):
+    toggl_tags = fetch_toggl_tags(request.user.togglcredentials.api_key) or []
+    actions_tags = TogglAction.objects.filter(user=request.user).values_list('tags', flat=True)
+
+    for t in actions_tags:
+        if t:
+            toggl_tags.extend(t.split(","))
+
+    return JsonResponse(toggl_tags, safe=False)
+
+@lazy_cache(maxsize=128, expires=60)
+def fetch_toggl_tags(api_key):
+    logger.info("Fetching toggl tags for api_key: " + api_key)
+    toggl = Toggl()
+    toggl.setAPIKey(api_key)
+
+    default_workspace = toggl.getWorkspaces()[0]
+
+    return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/tags")
+
 @login_required
 def get_toggl_projects(request):
     projects = fetch_toggl_projects(request.user.togglcredentials.api_key)

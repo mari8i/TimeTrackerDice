@@ -26,7 +26,7 @@ class TogglAction(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=64)
     project = models.IntegerField(null=True, default=None, blank=True)
-    tags = models.CharField(max_length=128, null=True, blank=True)
+    tags = models.CharField(max_length=256, blank=True, default="")
     
     def __str__(self):
         return self.user.username + ' - ' + self.name

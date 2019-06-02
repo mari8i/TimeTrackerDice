@@ -7,6 +7,25 @@
 {% block content %}
 
 <script src="{% static "js/bootstrap3-typeahead.min.js" %}"></script>
+<script src="{% static "js/bootstrap-tagsinput.min.js" %}"></script>
+<link rel="stylesheet" type="text/css" href="{% static "css/bootstrap-tagsinput.css" %}">
+<style> 
+  .bootstrap-tagsinput {
+  display: block;
+  width: 100%;
+  padding: .375rem .75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #495057;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid #ced4da;
+  border-radius: .25rem;
+  transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+  border-color: #007bff!important; 
+  }
+</style>
+
 
 <!-- <a href="https://github.com/bassjobsen/Bootstrap-3-Typeahead">USING THIS LIB</a>-->
 
@@ -47,6 +66,16 @@
 		   autocomplete="off"
 		   value="{{ mapping.action.project_name }}">
 	  </div>
+	  <div class="form-group">
+	    <label for="tags{{ mapping.face }}" style="font-weight: bold;">Toggl tags:</label>
+	    <input type="text"
+		   class="form-control typeahead border-primary"
+		   name="tags[{{ mapping.face }}]"
+		   id="tags{{ mapping.face }}"
+		   placeholder="Toggl tag"
+		   autocomplete="off"
+		   value="{{ mapping.action.tags }}">
+	  </div>	  
 	</p>
       </div>
     </div>
@@ -62,47 +91,64 @@
 
 <script>
 
-  let registerActionInput = function(face, data) {
-      let $actionInput = $("#action" + face);
-      $actionInput.typeahead({
-	  source: data,
-	  afterSelect: function(res) {
-	      if (res.project) {
-		  $("#project" + face).val(res.project);
-	      }
-          }
-      });
+let registerActionInput = function(face, data) {
+    let $actionInput = $("#action" + face);
+    $actionInput.typeahead({
+	source: data,
+	afterSelect: function(res) {
+	    if (res.project) {
+		$("#project" + face).val(res.project);
+	    }
+        }
+    });
 
-      $actionInput.on("click", function () {
-	  $(this).select();
-      });
-  }
+    $actionInput.on("click", function () {
+	$(this).select();
+    });
+}
 
-  let registerProjectInput = function(face, data) {
-      let $projectInput = $("#project" + face);
+let registerProjectInput = function(face, data) {
+    let $projectInput = $("#project" + face);
 
-      $projectInput.typeahead({
-          source:data,
-          showHintOnFocus: "all",
-          autoSelect: true
-      });
+    $projectInput.typeahead({
+        source:data,
+        showHintOnFocus: "all",
+        autoSelect: true
+    });
 
-      $projectInput.on("click", function () {
-	  $(this).select();
-      });
-  }
+    $projectInput.on("click", function () {
+	$(this).select();
+    });
+}
 
-  $.get("{% url 'toggl-actions' %}", function(data) {
-      {% for mapping in mappings %}
-      registerActionInput({{ mapping.face }}, data);
-      {% endfor %}
-  }, 'json');
+let registerTagsInput = function(face, data) {
+    let $tagsInput = $("#tags" + face);    
+    $tagsInput.tagsinput({
+	typeahead: {
+	    source: data
+	},
+	tagClass: 'badge badge-secondary',
+	freeInput: true
+    });
+}
 
-  $.get("{% url 'toggl-projects' %}", function(data){
-      {% for mapping in mappings %}
-      registerProjectInput({{ mapping.face }}, data);
-      {% endfor %}
-  }, 'json');
+$.get("{% url 'toggl-actions' %}", function(data) {
+    {% for mapping in mappings %}
+    registerActionInput({{ mapping.face }}, data);
+    {% endfor %}
+}, 'json');
+
+$.get("{% url 'toggl-projects' %}", function(data){
+    {% for mapping in mappings %}
+    registerProjectInput({{ mapping.face }}, data);
+    {% endfor %}
+}, 'json');
+
+$.get("{% url 'toggl-tags' %}", function(data){
+    {% for mapping in mappings %}
+    registerTagsInput({{ mapping.face }}, data);
+    {% endfor %}
+}, 'json');
 
 </script>
 
