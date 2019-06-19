@@ -14,7 +14,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from toggl.TogglPy import Toggl
-from dal import autocomplete
 from .models import TogglAction, TogglMapping, TogglCredentials
 from django.http import JsonResponse
 import urllib
@@ -46,14 +45,14 @@ def face_changed(request, face):
 
 class HomePageView(LoginRequiredMixin, TemplateView):
     template_name = "mapper/home.html"
-    
+
     def post(self, request):
         projects = fetch_toggl_projects(request.user.togglcredentials.api_key)
         for face in range(1, 9):
             action = request.POST['action[' + str(face) + ']']
             project = request.POST['project[' + str(face) + ']']
-            tags = request.POST['tags[' + str(face) + ']']            
-            
+            tags = request.POST['tags[' + str(face) + ']']
+
             try:
                 project_id = next(p['id']
                                   for p in projects
@@ -62,7 +61,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                 project_id = None
 
             try:
-                toggl_action = TogglAction.objects.get(user=request.user, name=action)            
+                toggl_action = TogglAction.objects.get(user=request.user, name=action)
                 toggl_action.project = project_id
             except TogglAction.DoesNotExist:
                 toggl_action = TogglAction(user=request.user, name=action, project=project_id)
@@ -73,18 +72,18 @@ class HomePageView(LoginRequiredMixin, TemplateView):
             toggl_mapping = TogglMapping.objects.get(user=request.user, face=face)
             toggl_mapping.action = toggl_action
             toggl_mapping.save()
-            
+
         #messages.info(self.request, "Actions saved!")
-        
+
         return redirect('home')
-    
+
     def get_context_data(self, **kwargs):
         context = super(HomePageView, self).get_context_data(**kwargs)
         context['has_toggl_credentials'] = bool(self.request.user.togglcredentials.api_key)
 
         if self.request.user.togglcredentials.api_key:
             try:
-                projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)        
+                projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)
                 context['mappings'] = [add_project_name_to_mapping(projects, mapping)
                                        for mapping in TogglMapping.objects.filter(user=self.request.user).order_by('face')]
             except urllib.error.HTTPError as e:
@@ -93,20 +92,20 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                     messages.error(self.request, "Toggl Credentials not valid")
                 else:
                     messages.error(self.request, "Error connecting to Toggl")
-                            
+
         return context
 
 
 class SettingsPageView(LoginRequiredMixin, TemplateView):
     template_name = "mapper/settings.html"
-    
+
     def post(self, request):
         TogglCredentials.objects \
                         .filter(user=request.user) \
                         .update(api_key=request.POST['toggl_api_key'])
-            
+
         return redirect('settings')
-    
+
     def get_context_data(self, **kwargs):
         context = super(SettingsPageView, self).get_context_data(**kwargs)
         context['toggl_api_key'] = self.request.user.togglcredentials.api_key
@@ -115,14 +114,14 @@ class SettingsPageView(LoginRequiredMixin, TemplateView):
             try:
                 projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)
             except urllib.error.HTTPError as e:
-                if e.getcode() == 403:                    
+                if e.getcode() == 403:
                     messages.error(self.request, "Toggl Credentials not valid")
                 else:
                     messages.error(self.request, "Error connecting to Toggl")
-                            
+
         return context
 
-    
+
 @lazy_cache(maxsize=128, expires=60)
 def fetch_toggl_projects(api_key):
     logger.info("Fetching toggl projects for api_key: " + api_key)
@@ -130,7 +129,7 @@ def fetch_toggl_projects(api_key):
     toggl.setAPIKey(api_key)
 
     default_workspace = toggl.getWorkspaces()[0]
-    
+
     return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/projects")
 
 @login_required
@@ -152,7 +151,7 @@ def fetch_toggl_tags(api_key):
 
     default_workspace = toggl.getWorkspaces()[0]
     toggl_tags = toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/tags")
-    
+
     return [tag['name']
             for tag in toggl_tags]
 
@@ -172,7 +171,7 @@ def get_toggl_projects(request):
 @login_required
 def get_existing_actions(request):
     projects = fetch_toggl_projects(request.user.togglcredentials.api_key)
-    
+
     data = [
         {
             "id": a.id,
@@ -186,7 +185,7 @@ def get_existing_actions(request):
 def find_project_name_by_id(projects, project_id):
     if project_id is None:
         return None
-    
+
     try:
         return next(project['name']
                     for project in projects
@@ -197,6 +196,5 @@ def find_project_name_by_id(projects, project_id):
 def add_project_name_to_mapping(projects, mapping):
     if mapping.action:
         mapping.action.project_name = find_project_name_by_id(projects, mapping.action.project) or ""
-        
-    return mapping
 
+    return mapping
