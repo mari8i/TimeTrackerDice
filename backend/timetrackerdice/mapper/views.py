@@ -61,8 +61,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                 project_id = None
 
             try:
-                toggl_action = TogglAction.objects.get(user=request.user, name=action)
-                toggl_action.project = project_id
+                toggl_action = TogglAction.objects.get(user=request.user, name=action, project=project_id)
             except TogglAction.DoesNotExist:
                 toggl_action = TogglAction(user=request.user, name=action, project=project_id)
 
