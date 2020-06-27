@@ -4,6 +4,6 @@ markdown
 django-filter
 #TogglPy
 django-bootstrap4
-#mysqlclient
+mysqlclient
 lru-expiring-cache
 https://github.com/mari8i/TogglPy/archive/master.zip

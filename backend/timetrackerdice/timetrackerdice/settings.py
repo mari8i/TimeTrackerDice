@@ -32,7 +32,7 @@ DEBUG = os.environ.get("TIME_TRACKER_PROD", False) != 'True'
 if DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
-    ALLOWED_HOSTS = ['timetracker.mariotti.dev']
+    ALLOWED_HOSTS = ['*']  # timetracker.mariotti.dev
 
 # Application definition
 
@@ -151,7 +151,7 @@ STATICFILES_DIRS = (
     "static/",
 )
 
-STATIC_ROOT = '/var/www/TimeTrackerDice/static/'
+STATIC_ROOT = '/app-data/static/'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

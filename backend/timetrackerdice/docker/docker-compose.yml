@@ -1,0 +1,35 @@
+version: '3'
+services:
+  db:
+    image: mysql:5.7
+    environment:
+      - MYSQL_ROOT_PASSWORD="${ROOT_PASSWORD}"
+      - MYSQL_DATABASE=timetrackerdice
+    volumes:
+      - "timetrackerdicedb:/var/lib/mysql"
+    restart: always
+  timetrackerdice:
+    build:
+      dockerfile: docker/Dockerfile
+      context: ../
+    environment:
+       - USE_MYSQL=True
+       - MYSQL_DATABASE=timetrackerdice
+       - MYSQL_USERNAME=root
+       - MYSQL_PASSWORD="${ROOT_PASSWORD}"
+       - MYSQL_HOST=db
+       - MYSQL_PORT=3306
+       - TIME_TRACKER_PROD=True
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.timetrackerdice.rule=Host(`timetrackerdice.zupit.software`)"
+      - "traefik.http.routers.timetrackerdice.tls=true"
+      - "traefik.http.routers.timetrackerdice.tls.certResolver=mariotti-software-resolver"
+    volumes:
+      - "timetrackerdicestatics:/app-data/"
+    ports:
+      - 8000:8000
+    restart: always
+volumes:
+  timetrackerdicedb:
+  timetrackerdicestatics:
