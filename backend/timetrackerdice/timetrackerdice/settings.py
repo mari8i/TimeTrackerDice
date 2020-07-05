@@ -32,7 +32,7 @@ DEBUG = os.environ.get("TIME_TRACKER_PROD", False) != 'True'
 if DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
-    ALLOWED_HOSTS = ['*']  # timetracker.mariotti.dev
+    ALLOWED_HOSTS = ['timetracker.mariotti.dev']  
 
 # Application definition
 
