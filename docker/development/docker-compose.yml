@@ -1,0 +1,21 @@
+version: '3'
+services:
+  redis:
+    image: redis:6.0.6
+    restart: always
+    ports:
+      - 6379:6379
+
+  timetrackerdice-db:
+    image: library/postgres:12.4
+    environment:
+      - POSTGRES_USER=timetrackerdice
+      - POSTGRES_PASSWORD=timetrackerdice
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres-timetrackerdice:/var/lib/postgresql/data
+
+volumes:
+  postgres-timetrackerdice:

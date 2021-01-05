@@ -1,0 +1,16 @@
+{
+  "name": "time-tracker-dice",
+  "version": "1.0.0",
+  "description": "The Time Tracker dice",
+  "scripts": {
+    "start-docker": "docker-compose --project-directory=. -f docker/development/docker-compose.yml up -d",
+    "stop-docker": "docker-compose --project-directory=. -f docker/development/docker-compose.yml down",
+    "build-docker": "docker-compose --project-directory=. -f docker/development/docker-compose.yml build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.zupit.software:zupit/zupit-bot.git"
+  },
+  "author": "Alessandro Mariotti",
+  "license": "Zupit Copyright"
+}
