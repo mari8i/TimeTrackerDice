@@ -142,8 +142,8 @@ STATICFILES_DIRS = (
 MEDIA_ROOT = env("MEDIA_ROOT")
 MEDIA_URL = env("MEDIA_URL", default="/media/")
 
-LOGIN_URL = "/admin/login/"
-LOGOUT_REDIRECT_URL = "/admin/login/"
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 
 CACHES = {
     "default": env.cache(),
