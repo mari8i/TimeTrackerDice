@@ -130,8 +130,14 @@ USE_L10N = True
 
 USE_TZ = True
 
-STATIC_ROOT = env("STATIC_ROOT")
+if not DEBUG:
+    STATIC_ROOT = env("STATIC_ROOT")
+
 STATIC_URL = env("STATIC_URL", default="/static/")
+
+STATICFILES_DIRS = (
+    "static/",
+)
 
 MEDIA_ROOT = env("MEDIA_ROOT")
 MEDIA_URL = env("MEDIA_URL", default="/media/")
