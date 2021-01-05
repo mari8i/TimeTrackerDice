@@ -1,27 +1,22 @@
 import logging
+import urllib
 
-from django.shortcuts import render, redirect
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import authentication, permissions
-from rest_framework.decorators import api_view, permission_classes
-from django.contrib.auth.models import User
-from rest_framework.permissions import IsAuthenticated
-
-from django.views.generic.base import TemplateView
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-
-from toggl.TogglPy import Toggl
-from .models import TogglAction, TogglMapping, TogglCredentials
 from django.http import JsonResponse
-import urllib
+from django.shortcuts import redirect
+from django.views.generic.base import TemplateView
 from lru import lazy_cache
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from toggl.TogglPy import Toggl
 
-#from functools import lru_cache
+from .models import TogglAction, TogglMapping, TogglCredentials
 
 logger = logging.getLogger(__name__)
+
 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
@@ -42,6 +37,7 @@ def face_changed(request, face):
         toggl.startTimeEntry(mapping.action.name, mapping.action.project, tags=tags)
 
     return Response("Hello World")
+
 
 class HomePageView(LoginRequiredMixin, TemplateView):
     template_name = "mapper/home.html"
@@ -131,6 +127,7 @@ def fetch_toggl_projects(api_key):
 
     return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/projects")
 
+
 @login_required
 def get_toggl_tags(request):
     toggl_tags = fetch_toggl_tags(request.user.togglcredentials.api_key) or []
@@ -142,7 +139,8 @@ def get_toggl_tags(request):
 
     return JsonResponse(toggl_tags, safe=False)
 
-@lazy_cache(maxsize=128, expires=60)
+
+# @lazy_cache(maxsize=128, expires=60)
 def fetch_toggl_tags(api_key):
     logger.info("Fetching toggl tags for api_key: " + api_key)
     toggl = Toggl()
@@ -153,6 +151,7 @@ def fetch_toggl_tags(api_key):
 
     return [tag['name']
             for tag in toggl_tags]
+
 
 @login_required
 def get_toggl_projects(request):
@@ -166,6 +165,7 @@ def get_toggl_projects(request):
         for p in projects]
 
     return JsonResponse(data, safe=False)
+
 
 @login_required
 def get_existing_actions(request):
@@ -181,6 +181,7 @@ def get_existing_actions(request):
 
     return JsonResponse(data, safe=False)
 
+
 def find_project_name_by_id(projects, project_id):
     if project_id is None:
         return None
@@ -191,6 +192,7 @@ def find_project_name_by_id(projects, project_id):
                     if project['id'] == project_id)
     except:
         return None
+
 
 def add_project_name_to_mapping(projects, mapping):
     if mapping.action:

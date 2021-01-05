@@ -1,0 +1,38 @@
+version: '3'
+services:
+  redis:
+    image: redis:6.0.6
+    restart: unless-stopped
+
+  timetrackerdice-db:
+    image: library/postgres:12.4
+    environment:
+      - POSTGRES_USER=timetrackerdice
+      - POSTGRES_PASSWORD=${CI_DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-timetrackerdice:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  timetrackerdice:
+    image: registry.mariotti.dev/timetrackerdice:latest
+    environment:
+      - SECRET_KEY=${CI_SECRET_KEY}
+      - DATABASE_URL=psql://timetrackerdice:${CI_DB_PASSWORD}@timetrackerdice-db:5432/timetrackerdice
+      - DB_WAIT_SLEEP_TIME=30
+    env_file:
+      - .env.production
+    depends_on:
+      - timetrackerdice-db
+    volumes:
+      - "data-timetrackerdice:/app-data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.timetrackerdice.rule=Host(`timetracker.mariotti.dev`)"
+      - "traefik.http.routers.timetrackerdice.tls=true"
+      - "traefik.http.routers.timetrackerdice.tls.certResolver=mariotti-software-resolver"
+    restart: unless-stopped
+
+volumes:
+  postgres-timetrackerdice:
+  data-timetrackerdice:
