@@ -1,4 +1,4 @@
-FROM python:3.5.9-buster
+FROM python:3.8.7-slim-buster
 
 RUN apt update && apt install -y apache2 apache2-dev && apt -y clean
 RUN pip install mod_wsgi
