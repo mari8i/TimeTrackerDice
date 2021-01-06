@@ -40,10 +40,10 @@ THE SOFTWARE.
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 
-//#define PRINTLN(x) Serial.println(x)
-//#define PRINT(x) Serial.print(x)
-#define PRINTLN(x)
-#define PRINT(x)
+#define PRINTLN(x) Serial.println(x)
+#define PRINT(x) Serial.print(x)
+//#define PRINTLN(x)
+//#define PRINT(x)
 
 #define INTERRUPT_PIN D5
 
@@ -74,7 +74,46 @@ const VectorFloat faces[FACES_NUMBER] =
 
 const char DEVICE_NAME[] = "TimeTrackerDice";
 const String HOSTNAME = "timetracker.mariotti.dev";
-const uint8_t fingerprint[20] = {0x47, 0xD2, 0x02, 0xDA, 0xD0, 0xE7, 0xFF, 0xE6, 0xE7, 0x04, 0xB6, 0x4C, 0x2D, 0x3A, 0x51, 0x7F, 0x77, 0x8E, 0x7E, 0x29};
+
+const char* test_root_ca= \
+     "-----BEGIN CERTIFICATE-----\n" \
+    "MIIDSjCCAjKgAwIBAgIQRK+wgNajJ7qJMDmGLvhAazANBgkqhkiG9w0BAQUFADA/\n" \
+    "MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT\n" \
+    "DkRTVCBSb290IENBIFgzMB4XDTAwMDkzMDIxMTIxOVoXDTIxMDkzMDE0MDExNVow\n" \
+    "PzEkMCIGA1UEChMbRGlnaXRhbCBTaWduYXR1cmUgVHJ1c3QgQ28uMRcwFQYDVQQD\n" \
+    "Ew5EU1QgUm9vdCBDQSBYMzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\n" \
+    "AN+v6ZdQCINXtMxiZfaQguzH0yxrMMpb7NnDfcdAwRgUi+DoM3ZJKuM/IUmTrE4O\n" \
+    "rz5Iy2Xu/NMhD2XSKtkyj4zl93ewEnu1lcCJo6m67XMuegwGMoOifooUMM0RoOEq\n" \
+    "OLl5CjH9UL2AZd+3UWODyOKIYepLYYHsUmu5ouJLGiifSKOeDNoJjj4XLh7dIN9b\n" \
+    "xiqKqy69cK3FCxolkHRyxXtqqzTWMIn/5WgTe1QLyNau7Fqckh49ZLOMxt+/yUFw\n" \
+    "7BZy1SbsOFU5Q9D8/RhcQPGX69Wam40dutolucbY38EVAjqr2m7xPi71XAicPNaD\n" \
+    "aeQQmxkqtilX4+U9m5/wAl0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNV\n" \
+    "HQ8BAf8EBAMCAQYwHQYDVR0OBBYEFMSnsaR7LHH62+FLkHX/xBVghYkQMA0GCSqG\n" \
+    "SIb3DQEBBQUAA4IBAQCjGiybFwBcqR7uKGY3Or+Dxz9LwwmglSBd49lZRNI+DT69\n" \
+    "ikugdB/OEIKcdBodfpga3csTS7MgROSR6cz8faXbauX+5v3gTt23ADq1cEmv8uXr\n" \
+    "AvHRAosZy5Q6XkjEGB5YGV8eAlrwDPGxrancWYaLbumR9YbK+rlmM6pZW87ipxZz\n" \
+    "R8srzJmwN0jP41ZL9c8PDHIyh8bwRLtTcm1D9SZImlJnt1ir/md2cXjbDaJWFBM5\n" \
+    "JDGFoqgCWjBH4d1QB7wCCZAA62RjYJsWvIjJEubSfZGL+T0yjWW06XyxV3bqxbYo\n" \
+    "Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ\n" \
+    "-----END CERTIFICATE-----\n";
+
+// const uint8_t fingerprint[20] = {0x47, 0xD2, 0x02, 0xDA, 0xD0, 0xE7, 0xFF, 0xE6, 0xE7, 0x04, 0xB6, 0x4C, 0x2D, 0x3A, 0x51, 0x7F, 0x77, 0x8E, 0x7E, 0x29};
+
+void setClock() {
+  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Waiting for NTP time sync: ");
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+  Serial.println("");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("Current time: ");
+  Serial.print(asctime(&timeinfo));
+}
 
 const int PORT = 443;
 
@@ -94,6 +133,7 @@ unsigned long faceCheckTimer = 0UL;
 String token = "";
 bool authenticated = false;
 
+
 struct {
   char username[40] = "";
   char password[40] = "";
@@ -101,14 +141,17 @@ struct {
 
 void resetWifi() {
   PRINTLN("RESETTING WIFI SETTINGS");
+  WiFiManager wifiManager;
+  wifiManager.erase();
   WiFi.disconnect(true);
+
   delay(3000);
   ESP.reset();
   delay(3000);
 }
 
 volatile bool mpuInterrupt = false;
-void dmpDataReady() {
+void ICACHE_RAM_ATTR dmpDataReady() {
     mpuInterrupt = true;
 }
 
@@ -222,7 +265,8 @@ bool authenticateAux() {
   String payload;
 
   std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
-  client->setFingerprint(fingerprint);
+  client->setInsecure();
+//  client->setFingerprint(fingerprint);
 
   HTTPClient https;
   if (https.begin(*client, "https://" + HOSTNAME + "/login/")) {
@@ -276,7 +320,8 @@ int notifyFaceChangedAux(int currentFace) {
   String postData = "HelloWorld";
 
   std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
-  client->setFingerprint(fingerprint);
+  client->setInsecure();
+  // client->setFingerprint(fingerprint);
 
   HTTPClient https;
   PRINT("AUTHENTICATING WITH: ");
@@ -384,6 +429,7 @@ bool initEEPROM() {
 
   return true;
 }
+
 
 void setup(void) {
   Serial.begin(9600);
