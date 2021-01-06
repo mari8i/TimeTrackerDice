@@ -40,10 +40,10 @@ THE SOFTWARE.
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 
-#define PRINTLN(x) Serial.println(x)
-#define PRINT(x) Serial.print(x)
-//#define PRINTLN(x)
-//#define PRINT(x)
+// #define PRINTLN(x) Serial.println(x)
+// #define PRINT(x) Serial.print(x)
+#define PRINTLN(x)
+#define PRINT(x)
 
 #define INTERRUPT_PIN D5
 
