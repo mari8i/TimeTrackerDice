@@ -16,4 +16,4 @@ pytz==2020.5
 six==1.15.0
 soupsieve==2.1
 sqlparse==0.4.1
-TogglPy==0.1.1
+https://github.com/mari8i/TogglPy/archive/master.zip
