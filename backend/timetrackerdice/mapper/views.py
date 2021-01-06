@@ -1,5 +1,5 @@
 import logging
-import urllib
+from dataclasses import asdict
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -7,59 +7,59 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.views.generic.base import TemplateView
-from lru import lazy_cache
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from toggl.TogglPy import Toggl
 
 from .models import TogglAction, TogglMapping, TogglCredentials
+from .toggl import TogglService, TogglInvalidCredentialsError, TogglConnectionError
 
 logger = logging.getLogger(__name__)
 
 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
-def face_changed(request, face):
-    logger.info("User %s changed device %s to face: %d", request.user, 'LOL', face)
+def face_changed(request, face: int):
+    logger.info(f"User {request.user} switched to face {face}")
 
-    toggl = Toggl()
-    toggl.setAPIKey(request.user.togglcredentials.api_key)
+    if face < 0 or face > 8:
+        raise ValidationError({"error": f"Invalid face {face}"})
+
+    toggl = TogglService(request.user)
 
     if face == 0:
-        currentTimer = toggl.currentRunningTimeEntry()
-        if currentTimer and currentTimer['data'] and currentTimer['data']['id']:
-            toggl.stopTimeEntry(currentTimer['data']['id'])
+        toggl.stop_current_time_entry()
     else:
-        mapping = request.user.togglmapping_set.get(face=face)
+        mapping = request.user.togglmapping_set.select_related('action').get(face=face)
 
         tags = mapping.action.tags.split(",") if mapping.action.tags else None
-        toggl.startTimeEntry(mapping.action.name, mapping.action.project, tags=tags)
+        toggl.start_time_entry(mapping.action.name, mapping.action.project, tags=tags)
 
-    return Response("Hello World")
+    response = {
+        "status": "success",
+        "face": face,
+        "action": "stopped" if face == 0 else "started",
+    }
+
+    return Response(response, status=status.HTTP_200_OK)
 
 
 class HomePageView(LoginRequiredMixin, TemplateView):
     template_name = "mapper/home.html"
 
     def post(self, request):
-        projects = fetch_toggl_projects(request.user.togglcredentials.api_key)
+        toggl = TogglService(request.user)
+
         for face in range(1, 9):
             action = request.POST['action[' + str(face) + ']']
             project = request.POST['project[' + str(face) + ']']
             tags = request.POST['tags[' + str(face) + ']']
 
-            try:
-                project_id = next(p['id']
-                                  for p in projects
-                                  if p['name'] == project)
-            except:
-                project_id = None
+            toggl_project_id = toggl.find_project_id_by_name(project)
 
-            try:
-                toggl_action = TogglAction.objects.get(user=request.user, name=action, project=project_id)
-            except TogglAction.DoesNotExist:
-                toggl_action = TogglAction(user=request.user, name=action, project=project_id)
+            toggl_action, _ = TogglAction.objects.get_or_create(user=request.user, name=action, project=toggl_project_id)
 
             toggl_action.tags = tags
             toggl_action.save()
@@ -74,19 +74,20 @@ class HomePageView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super(HomePageView, self).get_context_data(**kwargs)
-        context['has_toggl_credentials'] = bool(self.request.user.togglcredentials.api_key)
+        has_toggl_credentials = bool(self.request.user.togglcredentials.api_key)
+        context['has_toggl_credentials'] = has_toggl_credentials
 
-        if self.request.user.togglcredentials.api_key:
+        toggl = TogglService(self.request.user)
+
+        if has_toggl_credentials:
             try:
-                projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)
-                context['mappings'] = [add_project_name_to_mapping(projects, mapping)
+                context['mappings'] = [add_project_name_to_mapping(toggl, mapping)
                                        for mapping in TogglMapping.objects.filter(user=self.request.user).order_by('face')]
-            except urllib.error.HTTPError as e:
-                if e.getcode() == 403:
-                    context['has_toggl_credentials'] = False
-                    messages.error(self.request, "Toggl Credentials not valid")
-                else:
-                    messages.error(self.request, "Error connecting to Toggl")
+            except TogglInvalidCredentialsError:
+                context['has_toggl_credentials'] = False
+                messages.error(self.request, "Toggl Credentials not valid")
+            except TogglConnectionError:
+                messages.error(self.request, "Error connecting to Toggl")
 
         return context
 
@@ -107,30 +108,20 @@ class SettingsPageView(LoginRequiredMixin, TemplateView):
 
         if self.request.user.togglcredentials.api_key:
             try:
-                projects = fetch_toggl_projects(self.request.user.togglcredentials.api_key)
-            except urllib.error.HTTPError as e:
-                if e.getcode() == 403:
-                    messages.error(self.request, "Toggl Credentials not valid")
-                else:
-                    messages.error(self.request, "Error connecting to Toggl")
+                toggl = TogglService(self.request.user)
+                toggl.test_api_key()
+            except TogglInvalidCredentialsError:
+                messages.error(self.request, "Toggl Credentials not valid")
+            except TogglConnectionError:
+                messages.error(self.request, "Error connecting to Toggl")
 
         return context
 
 
-@lazy_cache(maxsize=128, expires=60)
-def fetch_toggl_projects(api_key):
-    logger.info("Fetching toggl projects for api_key: " + api_key)
-    toggl = Toggl()
-    toggl.setAPIKey(api_key)
-
-    default_workspace = toggl.getWorkspaces()[0]
-
-    return toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/projects")
-
-
 @login_required
 def get_toggl_tags(request):
-    toggl_tags = fetch_toggl_tags(request.user.togglcredentials.api_key) or []
+    toggl = TogglService(request.user)
+    toggl_tags = [t.name for t in toggl.fetch_toggl_tags()]
     actions_tags = TogglAction.objects.filter(user=request.user).values_list('tags', flat=True)
 
     for t in actions_tags:
@@ -140,62 +131,30 @@ def get_toggl_tags(request):
     return JsonResponse(toggl_tags, safe=False)
 
 
-@lazy_cache(maxsize=128, expires=60)
-def fetch_toggl_tags(api_key):
-    logger.info("Fetching toggl tags for api_key: " + api_key)
-    toggl = Toggl()
-    toggl.setAPIKey(api_key)
-
-    default_workspace = toggl.getWorkspaces()[0]
-    toggl_tags = toggl.request("https://www.toggl.com/api/v8/workspaces/" + str(default_workspace['id']) + "/tags")
-
-    return [tag['name']
-            for tag in toggl_tags]
-
-
 @login_required
 def get_toggl_projects(request):
-    projects = fetch_toggl_projects(request.user.togglcredentials.api_key)
-
-    data = [
-        {
-            "id": p['id'],
-            "name": p['name']
-        }
-        for p in projects]
-
-    return JsonResponse(data, safe=False)
+    toggl = TogglService(request.user)
+    projects = toggl.fetch_toggl_projects()
+    return JsonResponse([asdict(p) for p in projects], safe=False)
 
 
 @login_required
 def get_existing_actions(request):
-    projects = fetch_toggl_projects(request.user.togglcredentials.api_key)
+    toggl = TogglService(request.user)
 
     data = [
         {
             "id": a.id,
             "name": a.name,
-            "project": find_project_name_by_id(projects, a.project)
+            "project": toggl.find_project_name_by_id(a.project)
         }
         for a in TogglAction.objects.filter(user=request.user)]
 
     return JsonResponse(data, safe=False)
 
 
-def find_project_name_by_id(projects, project_id):
-    if project_id is None:
-        return None
-
-    try:
-        return next(project['name']
-                    for project in projects
-                    if project['id'] == project_id)
-    except:
-        return None
-
-
-def add_project_name_to_mapping(projects, mapping):
+def add_project_name_to_mapping(toggl, mapping):
     if mapping.action:
-        mapping.action.project_name = find_project_name_by_id(projects, mapping.action.project) or ""
+        mapping.action.project_name = toggl.find_project_name_by_id(mapping.action.project) or ""
 
     return mapping

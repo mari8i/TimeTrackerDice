@@ -17,3 +17,6 @@ six==1.15.0
 soupsieve==2.1
 sqlparse==0.4.1
 https://github.com/mari8i/TogglPy/archive/master.zip
+django-injector==0.2.0
+injector==0.18.4
+typing-extensions==3.7.4.3
