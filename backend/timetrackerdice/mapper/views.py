@@ -59,7 +59,9 @@ class HomePageView(LoginRequiredMixin, TemplateView):
 
             toggl_project_id = toggl.find_project_id_by_name(project)
 
-            toggl_action, _ = TogglAction.objects.get_or_create(user=request.user, name=action, project=toggl_project_id)
+            toggl_action, _ = TogglAction.objects.get_or_create(user=request.user,
+                                                                name=action,
+                                                                project=toggl_project_id)
 
             toggl_action.tags = tags
             toggl_action.save()
@@ -67,8 +69,6 @@ class HomePageView(LoginRequiredMixin, TemplateView):
             toggl_mapping = TogglMapping.objects.get(user=request.user, face=face)
             toggl_mapping.action = toggl_action
             toggl_mapping.save()
-
-        #messages.info(self.request, "Actions saved!")
 
         return redirect('home')
 
@@ -81,8 +81,13 @@ class HomePageView(LoginRequiredMixin, TemplateView):
 
         if has_toggl_credentials:
             try:
+                mappings = TogglMapping.objects \
+                    .select_related('action') \
+                    .filter(user=self.request.user) \
+                    .order_by('face')
+
                 context['mappings'] = [add_project_name_to_mapping(toggl, mapping)
-                                       for mapping in TogglMapping.objects.filter(user=self.request.user).order_by('face')]
+                                       for mapping in mappings]
             except TogglInvalidCredentialsError:
                 context['has_toggl_credentials'] = False
                 messages.error(self.request, "Toggl Credentials not valid")
