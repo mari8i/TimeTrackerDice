@@ -140,7 +140,7 @@ def get_toggl_tags(request):
     return JsonResponse(toggl_tags, safe=False)
 
 
-# @lazy_cache(maxsize=128, expires=60)
+@lazy_cache(maxsize=128, expires=60)
 def fetch_toggl_tags(api_key):
     logger.info("Fetching toggl tags for api_key: " + api_key)
     toggl = Toggl()
