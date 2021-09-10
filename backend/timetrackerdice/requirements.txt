@@ -15,7 +15,7 @@ psycopg2-binary==2.8.5
 pytz==2020.5
 six==1.15.0
 soupsieve==2.1
-sqlparse==0.4.1
+sqlparse==0.4.2
 https://github.com/mari8i/TogglPy/archive/master.zip
 django-injector==0.2.0
 injector==0.18.4
